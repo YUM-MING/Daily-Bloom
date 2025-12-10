@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Bloom</title>
+  <link href='/style.css' rel='stylesheet'>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
+  <script defer src="/main.js"></script>
+</head>
+<body>
+  <div class="container">
+    <app-header></app-header>
+    
+    <div id="main-content">
+      <goal-list></goal-list>
+      <calendar-view></calendar-view>
+      <daily-view class="hidden"></daily-view>
+    </div>
+  </div>
+</body>
+</html>
