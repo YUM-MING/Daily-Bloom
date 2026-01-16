@@ -1,0 +1,15 @@
+{
+  "name": "daily-bloom",
+  "version": "1.0.0",
+  "description": "일정 관리 웹사이트",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase": "^12.8.0"
+  }
+}

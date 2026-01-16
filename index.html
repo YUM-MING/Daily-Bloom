@@ -7,18 +7,29 @@
   <link href='/style.css' rel='stylesheet'>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
-  <script defer src="/main.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@600&family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
+  <!-- Loading Overlay -->
+  <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-color); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+    <img src="/assets/logo.svg" style="width:80px; animation: pulse 2s infinite;">
+    <p style="margin-top:20px; color:var(--primary-color); font-family:'Dancing Script', cursive; font-size:1.5rem;">Loading...</p>
+  </div>
+
+  <app-login id="login-view" class="hidden"></app-login>
+
+  <div class="container hidden" id="app-view">
     <app-header></app-header>
     
+    <my-page class="hidden"></my-page>
+
+    <goal-list></goal-list>
     <div id="main-content">
-      <goal-list></goal-list>
       <calendar-view></calendar-view>
-      <daily-view class="hidden"></daily-view>
+      <daily-view></daily-view>
     </div>
   </div>
+  
+  <script type="module" src="/main.js"></script>
 </body>
 </html>

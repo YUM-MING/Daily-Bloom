@@ -1,15 +1,15 @@
 :root {
   /* Colors - Light Mode (Default) */
-  --bg-color: #ffffff;
-  --text-color: #121212;
-  --surface-color: #f8f9fa;
-  --border-color: #e0e0e0;
+  --bg-color: #f7f8fa;
+  --text-color: #333333;
+  --surface-color: #ffffff;
+  --border-color: #eeeeee;
   
-  --primary-color: #ff80ab; /* Soft Pink */
-  --primary-hover: #ff4081; /* Darker Pink */
-  --on-primary: #ffffff;
+  --primary-color: #ffc1cc;
+  --primary-hover: #ffb7c5; 
+  --on-primary: #333333;
 
-  --accent-color: #121212; /* Black accent */
+  --accent-color: #555555;
   
   /* Spacing */
   --spacing-sm: 8px;
@@ -17,23 +17,25 @@
   --spacing-lg: 24px;
   
   /* Typography */
-  --font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  --font-family: 'Gowun Dodum', 'Pretendard', sans-serif;
   --font-size-base: 16px;
   --font-size-lg: 20px;
   --font-size-xl: 24px;
+  --icon-filter: none;
 }
 
 [data-theme="dark"] {
   --bg-color: #121212;
-  --text-color: #ffffff;
+  --text-color: #e0e0e0;
   --surface-color: #1e1e1e;
   --border-color: #333333;
   
-  --primary-color: #ff80ab;
-  --primary-hover: #ff4081;
-  --on-primary: #000000;
+  --primary-color: #f48fb1; 
+  --primary-hover: #f06292;
+  --on-primary: #121212;
 
   --accent-color: #ffffff;
+  --icon-filter: invert(1);
 }
 
 * {
@@ -59,6 +61,15 @@ body {
   margin: 0 auto;
   padding: var(--spacing-md);
   width: 100%;
+  flex-grow: 1; /* Allow container to grow */
+  display: flex; /* Flex to manage children */
+  flex-direction: column;
+}
+
+/* Ensure app view takes full height */
+#app-view {
+    display: block;
+    min-height: 100vh;
 }
 
 button {
@@ -94,6 +105,20 @@ input:focus, textarea:focus {
   margin-bottom: var(--spacing-md);
 }
 
+/* Split Layout */
+#main-content {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr; /* Calendar wider than Daily Panel */
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  #main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
 h1, h2, h3 {
   font-weight: 700;
   margin-bottom: var(--spacing-sm);
@@ -105,6 +130,9 @@ h1, h2, h3 {
   padding: 8px 16px;
   border-radius: 20px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-icon {
@@ -113,8 +141,111 @@ h1, h2, h3 {
   padding: 8px;
   border-radius: 50%;
   font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hidden {
   display: none !important;
+}
+
+/* Custom Checkbox */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--primary-color);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '✔';
+  font-size: 14px;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+}
+
+input[type="checkbox"]:hover {
+  background-color: rgba(255, 193, 204, 0.2);
+}
+
+/* Login View */
+app-login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+}
+
+/* My Page */
+.my-page-container {
+    background: var(--surface-color);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.profile-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.friend-search {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.friend-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.friend-card {
+    background: var(--bg-color);
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.friend-card.mutual {
+    border-color: var(--primary-color);
+    background-color: rgba(255, 193, 204, 0.1);
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    background: var(--primary-color);
+    color: white;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
 }

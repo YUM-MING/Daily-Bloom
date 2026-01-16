@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" fill="none">
+  <!-- Two Intertwined Hearts (Fixed Padding) -->
+  <defs>
+    <linearGradient id="heart1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFC1CC;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#F48FB1;stop-opacity:0.95" />
+    </linearGradient>
+    <linearGradient id="heart2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F8BBD0;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#F06292;stop-opacity:0.9" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- Group to center everything -->
+  <g transform="translate(20, 20)">
+      <!-- Smaller Heart (Back/Left) -->
+      <g transform="translate(10, 20) rotate(-15 50 50) scale(0.75)">
+         <path d="M50 90 C 50 90, 10 60, 10 35 C 10 15, 30 10, 50 30 C 70 10, 90 15, 90 35 C 90 60, 50 90, 50 90 Z" fill="url(#heart2)" />
+      </g>
+
+      <!-- Larger Heart (Front/Right) -->
+      <g transform="translate(30, 10) rotate(10 50 50) scale(0.9)">
+         <path d="M50 90 C 50 90, 10 60, 10 35 C 10 15, 30 10, 50 30 C 70 10, 90 15, 90 35 C 90 60, 50 90, 50 90 Z" fill="url(#heart1)" filter="url(#glow)" />
+         <!-- Shine -->
+         <path d="M25 35 Q 35 25 45 30" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.5" />
+      </g>
+  </g>
+</svg>
