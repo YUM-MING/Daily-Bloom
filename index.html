@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JEGN0FTB9"></script>
@@ -19,9 +19,46 @@
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Bloom</title>
+  
+  <!-- Basic SEO -->
+  <title>Daily Bloom | MBTI "J"를 위한 미니멀 일정 관리 & 블룸</title>
+  <meta name="description" content="Daily Bloom은 MBTI 'J' 성향을 위한 가장 심플하고 아름다운 일정 관리 웹 서비스입니다. 캘린더, 목표 설정, 그리고 친구와의 실시간 '블룸' 응원을 통해 당신의 하루를 기록하세요." />
+  <meta name="keywords" content="일정관리, 플래너, MBTI J, 캘린더, 다이어리, Daily Bloom, 데일리블룸, 목표설정, 소셜플래너" />
+  <link rel="canonical" href="https://dailybloomyourday.web.app/" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://dailybloomyourday.web.app/" />
+  <meta property="og:title" content="Daily Bloom | 당신의 하루를 피워보세요" />
+  <meta property="og:description" content="MBTI 'J'를 위한 최적의 일정 관리. 친구들과 응원을 주고받으며 계획적인 일상을 만들어보세요." />
+  <meta property="og:image" content="https://dailybloomyourday.web.app/assets/logo.svg" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://dailybloomyourday.web.app/" />
+  <meta property="twitter:title" content="Daily Bloom | 당신의 하루를 피워보세요" />
+  <meta property="twitter:description" content="MBTI 'J'를 위한 최적의 일정 관리. 친구들과 응원을 주고받으며 계획적인 일상을 만들어보세요." />
+  <meta property="twitter:image" content="https://dailybloomyourday.web.app/assets/logo.svg" />
+
   <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
   <link href='/style.css' rel='stylesheet'>
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Daily Bloom",
+    "url": "https://dailybloomyourday.web.app/",
+    "description": "A minimalist daily planner for MBTI 'J' types with social features.",
+    "applicationCategory": "PlannerApplication, LifestyleApplication",
+    "operatingSystem": "All",
+    "author": {
+      "@type": "Person",
+      "name": "YUM-MING"
+    }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@600&family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
@@ -29,7 +66,7 @@
 <body>
   <!-- Loading Overlay -->
   <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-color); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
-    <img src="/assets/logo.svg" style="width:80px; animation: pulse 2s infinite;">
+    <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:80px; animation: pulse 2s infinite;">
     <p style="margin-top:20px; color:var(--primary-color); font-family:'Dancing Script', cursive; font-size:1.5rem;">Loading...</p>
   </div>
 

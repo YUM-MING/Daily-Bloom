@@ -665,7 +665,7 @@ class AppLogin extends HTMLElement {
             .btn-primary { font-family: 'Gowun Dodum', sans-serif; font-size: 1.1rem; padding: 12px 32px; border-radius: 30px; }
         </style>
         <div class="login-container" style="text-align:center;">
-             <img src="/assets/logo.svg" style="width:120px; margin-bottom:10px;">
+             <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:120px; margin-bottom:10px;">
              <h1>Daily Bloom</h1>
              <p>당신의 하루를 아름답게 피워보세요.</p>
              <button class="btn-primary" id="google-btn">
@@ -700,9 +700,9 @@ class MyPage extends BaseComponent {
             <div class="my-page-container">
                 <div class="profile-section">
                     <div style="position: relative; cursor: pointer; width: 80px; height: 80px;" id="avatar-container">
-                        <img src="${user.photoURL}" style="width:100%; height:100%; border-radius:50%; object-fit: cover; border: 2px solid var(--primary-color);">
+                        <img src="${user.photoURL}" alt="${user.nickname}'s profile" style="width:100%; height:100%; border-radius:50%; object-fit: cover; border: 2px solid var(--primary-color);">
                         <div style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 5px; box-sizing: border-box;">
-                            <img src="/assets/camera.svg" style="width:100%; height:100%;">
+                            <img src="/assets/camera.svg" alt="Upload photo" style="width:100%; height:100%;">
                         </div>
                         <input type="file" id="photo-upload" style="display: none;" accept="image/*">
                     </div>
@@ -732,7 +732,7 @@ class MyPage extends BaseComponent {
                         const isMutual = f.blooms && f.blooms.includes(user.uid);
                         return `
                         <div class="friend-card ${isMutual ? 'mutual' : ''}" data-uid="${f.uid}">
-                            <img src="${f.photoURL || '/assets/logo.svg'}" style="width:40px; height:40px; border-radius:50%; margin-bottom:5px;">
+                            <img src="${f.photoURL || '/assets/logo.svg'}" alt="${f.nickname}'s profile" style="width:40px; height:40px; border-radius:50%; margin-bottom:5px;">
                             <br>
                             <strong>${f.nickname}</strong>
                             ${isMutual ? `<br><span class="badge" style="margin-top:4px;">${t.mutual} 🌸</span>` : ''}
@@ -942,7 +942,7 @@ class AppHeader extends BaseComponent {
         
         ${store.state.viewingUser ? `
             <div class="viewing-indicator">
-                <img src="${store.state.viewingUser.photoURL || '/assets/logo.svg'}" style="width:28px; height:28px; border-radius:50%; border: 2px solid var(--primary-color); object-fit: cover;">
+                <img src="${store.state.viewingUser.photoURL || '/assets/logo.svg'}" alt="${store.state.viewingUser.nickname}'s profile" style="width:28px; height:28px; border-radius:50%; border: 2px solid var(--primary-color); object-fit: cover;">
                 <span>${store.state.viewingUser.nickname}'s Bloom</span>
                 <button class="btn-primary" id="home-btn" style="margin-left:10px; font-size:0.7rem; padding:4px 10px;">Back Home</button>
             </div>
@@ -956,18 +956,18 @@ class AppHeader extends BaseComponent {
         <div class="controls">
             ${store.state.user && !store.state.viewingUser ? `
                 <button class="btn-icon" id="search-toggle-btn">
-                    <img src="/assets/search.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
+                    <img src="/assets/search.svg" alt="Search" style="width:100%; height:100%; filter: var(--icon-filter);">
                 </button>
             ` : ''}
             
             <button class="btn-icon" id="theme-btn">
-                <img src="/assets/moon.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
+                <img src="/assets/moon.svg" alt="Toggle Theme" style="width:100%; height:100%; filter: var(--icon-filter);">
             </button>
 
             ${store.state.user ? `
                 <div class="notification-wrapper">
                     <button class="btn-icon" id="noti-btn">
-                        <img src="/assets/bell.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
+                        <img src="/assets/bell.svg" alt="Notifications" style="width:100%; height:100%; filter: var(--icon-filter);">
                         ${store.state.notifications.length > 0 ? `<div class="noti-badge">${store.state.notifications.length}</div>` : ''}
                     </button>
                     <div class="noti-dropdown" id="noti-dropdown">
@@ -982,7 +982,7 @@ class AppHeader extends BaseComponent {
                     </div>
                 </div>
                 <div class="profile-trigger" id="mypage-btn">
-                    <img src="${user.photoURL || '/assets/logo.svg'}" class="avatar-small">
+                    <img src="${user.photoURL || '/assets/logo.svg'}" alt="My Page" class="avatar-small">
                 </div>
             ` : ''}
             
@@ -1561,7 +1561,7 @@ class DailyView extends BaseComponent {
                         const isAuthor = store.state.user && c.fromUserId === store.state.user.uid;
                         return `
                         <div class="comment-item" style="display:flex; gap:10px; align-items:flex-start; margin-bottom: 10px;">
-                            <img src="${c.authorPhoto || '/assets/logo.svg'}" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
+                            <img src="${c.authorPhoto || '/assets/logo.svg'}" alt="${c.author}'s profile" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
                             <div style="flex-grow:1;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${c.fromUserId}">${c.author}</div>
@@ -1667,7 +1667,7 @@ class DailyView extends BaseComponent {
                     const mutuals = store.state.blooms.filter(f => f.blooms && f.blooms.includes(store.state.user.uid));
                     const matches = mutuals.filter(f => f.nickname.toLowerCase().startsWith(query));
                     if (matches.length > 0) {
-                        suggestionsBox.innerHTML = matches.map(f => `<div class="suggestion-item" data-nick="${f.nickname}"><img src="${f.photoURL || '/assets/logo.svg'}">${f.nickname}</div>`).join('');
+                        suggestionsBox.innerHTML = matches.map(f => `<div class="suggestion-item" data-nick="${f.nickname}"><img src="${f.photoURL || '/assets/logo.svg'}" alt="${f.nickname}'s profile">${f.nickname}</div>`).join('');
                         suggestionsBox.classList.add('active');
                         suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
                             item.addEventListener('click', () => {
