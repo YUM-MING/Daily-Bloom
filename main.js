@@ -1178,11 +1178,11 @@ class CalendarView extends BaseComponent {
                 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative; }
                 .nav-btn { background: none; border: 1px solid var(--border-color); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; color: var(--text-color); display: flex; align-items: center; justify-content: center; z-index: 2; }
                 .nav-btn:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-                .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
-                .day-header { text-align: center; font-weight: bold; color: var(--primary-color); padding: 10px 0; }
-                .day-cell { background: var(--surface-color); min-height: 100px; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; border: 1px solid transparent; transition: all 0.2s; overflow: visible; min-width: 0; }
-                .day-cell:hover { border-color: var(--primary-color); transform: translateY(-2px); }
-                .day-number { font-weight: bold; margin-bottom: 5px; }
+                .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; width: 100%; table-layout: fixed; }
+                .day-header { text-align: center; font-weight: bold; color: var(--primary-color); padding: 10px 0; overflow: hidden; }
+                .day-cell { background: var(--surface-color); min-height: 110px; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; border: 1px solid transparent; transition: all 0.2s; overflow: visible; min-width: 0; position: relative; }
+                .day-cell:hover { border-color: var(--primary-color); transform: translateY(-2px); z-index: 10; }
+                .day-number { font-weight: bold; margin-bottom: 8px; font-size: 0.9rem; }
                 .today { background-color: rgba(233, 30, 99, 0.05); border: 1px solid var(--primary-hover); }
                 .selected { border: 2px solid var(--primary-color); background-color: rgba(255, 193, 204, 0.1); }
                 .task-preview { 
@@ -1190,31 +1190,35 @@ class CalendarView extends BaseComponent {
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis; 
-                    margin-bottom: 2px; 
+                    margin-bottom: 3px; 
                     width: 100%; 
-                    padding: 2px 4px; 
+                    height: 20px;
+                    line-height: 16px;
+                    padding: 2px 6px; 
                     border-radius: 4px; 
                     position: relative; 
                     box-sizing: border-box;
+                    z-index: 1;
                 }
                 .task-preview.completed { text-decoration: line-through; opacity: 0.5; color: var(--accent-color); }
                 
-                /* Multi-day task styling */
+                /* Multi-day task styling - Precision connection */
                 .task-preview.multi-day { 
                     background: var(--primary-color); 
                     color: var(--on-primary); 
                     border-radius: 0; 
-                    width: calc(100% + 24px); /* Bridge: left padding(8) + right padding(8) + gap(8) */
+                    /* Cover own padding(8) + gap(8) + next padding(8) + 1px overlap */
+                    width: calc(100% + 25px); 
                     margin-left: -8px; 
-                    margin-right: -16px; 
+                    margin-right: -17px; 
                     padding-left: 8px;
-                    z-index: 1;
+                    font-weight: 600;
                 }
                 .task-preview.multi-day.start { 
                     border-top-left-radius: 10px; 
                     border-bottom-left-radius: 10px; 
                     margin-left: 0; 
-                    width: calc(100% + 16px);
+                    width: calc(100% + 17px);
                 }
                 .task-preview.multi-day.end { 
                     border-top-right-radius: 10px; 
@@ -1225,8 +1229,8 @@ class CalendarView extends BaseComponent {
                     padding-right: 8px;
                 }
                 .task-preview.multi-day.no-bleed {
-                    width: 100% !important;
-                    margin-right: 0 !important;
+                    width: calc(100% + 8px) !important;
+                    margin-right: -8px !important;
                 }
                 .task-preview.multi-day.single { border-radius: 10px; margin-left: 0; margin-right: 0; width: 100%; }
 
