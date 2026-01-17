@@ -408,6 +408,7 @@ class Store extends EventTarget {
 
     const groupId = 'group-' + Date.now();
     const baseDate = new Date(dateStr);
+    const order = Date.now(); // Consistent order for the whole group
 
     const tasksToAdd = [];
     
@@ -442,6 +443,7 @@ class Store extends EventTarget {
             completed: false,
             createdAt: new Date().toISOString(),
             groupId,
+            order, // Set consistent order for alignment
             duration: taskData.duration || 1,
             dayIndex: taskData.dayIndex ?? -1
         };
@@ -1178,25 +1180,41 @@ class CalendarView extends BaseComponent {
                 .nav-btn:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
                 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
                 .day-header { text-align: center; font-weight: bold; color: var(--primary-color); padding: 10px 0; }
-                .day-cell { background: var(--surface-color); min-height: 100px; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; border: 1px solid transparent; transition: all 0.2s; overflow: hidden; }
+                .day-cell { background: var(--surface-color); min-height: 100px; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; border: 1px solid transparent; transition: all 0.2s; overflow: visible; }
                 .day-cell:hover { border-color: var(--primary-color); transform: translateY(-2px); }
                 .day-number { font-weight: bold; margin-bottom: 5px; }
                 .today { background-color: rgba(233, 30, 99, 0.05); border: 1px solid var(--primary-hover); }
                 .selected { border: 2px solid var(--primary-color); background-color: rgba(255, 193, 204, 0.1); }
-                .task-preview { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; max-width: 100%; padding: 2px 4px; border-radius: 4px; }
+                .task-preview { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; max-width: 100%; padding: 2px 4px; border-radius: 4px; position: relative; }
                 .task-preview.completed { text-decoration: line-through; opacity: 0.5; color: var(--accent-color); }
                 
                 /* Multi-day task styling */
-                .task-preview.multi-day { background: var(--primary-color); color: var(--on-primary); border-radius: 0; margin-left: -8px; margin-right: -8px; padding-left: 12px; }
-                .task-preview.multi-day.start { border-top-left-radius: 10px; border-bottom-left-radius: 10px; margin-left: 2px; }
-                .task-preview.multi-day.end { border-top-right-radius: 10px; border-bottom-right-radius: 10px; margin-right: 2px; }
+                .task-preview.multi-day { 
+                    background: var(--primary-color); 
+                    color: var(--on-primary); 
+                    border-radius: 0; 
+                    margin-left: -8px; 
+                    margin-right: -16px; /* Bridge gap (8px) + next cell padding (8px) */
+                    padding-left: 8px;
+                    z-index: 1;
+                }
+                .task-preview.multi-day.start { 
+                    border-top-left-radius: 10px; 
+                    border-bottom-left-radius: 10px; 
+                    margin-left: 2px; 
+                }
+                .task-preview.multi-day.end { 
+                    border-top-right-radius: 10px; 
+                    border-bottom-right-radius: 10px; 
+                    margin-right: 2px; 
+                }
                 .task-preview.multi-day.single { border-radius: 10px; margin-left: 2px; margin-right: 2px; }
 
                 .title-clickable { cursor: pointer; padding: 4px 12px; border-radius: 12px; transition: all 0.2s; font-size: 1.5rem; font-weight: bold; display: flex; align-items: center; gap: 8px; }
                 .title-clickable:hover { background: rgba(255, 193, 204, 0.2); color: var(--primary-hover); }
                 .title-clickable::after { content: '▾'; font-size: 0.8rem; opacity: 0.5; }
             </style>
-            <div class="card">
+            <div class="card" style="overflow: hidden;">
                 <div class="calendar-header">
                     <button id="prev-btn" class="nav-btn">‹</button>
                     
@@ -1236,20 +1254,32 @@ class CalendarView extends BaseComponent {
                         const isToday = today.toDateString() === new Date(year, month, d).toDateString();
                         const isSelected = selectedDate === dateStr;
                         const dayTasks = tasks[dateStr] || [];
+                        const dayOfWeek = new Date(year, month, d).getDay();
+
                         return `
                             <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}">
                                 <div class="day-number">${d}</div>
                                 ${dayTasks.slice(0, 3).map(t => {
                                     const isMulti = t.duration && t.duration > 1;
                                     let multiClass = '';
+                                    let content = (t.completed ? '✔ ' : '') + t.text;
+                                    
                                     if (isMulti) {
                                         multiClass = 'multi-day';
                                         if (t.dayIndex === 0) multiClass += ' start';
                                         else if (t.dayIndex === t.duration - 1) multiClass += ' end';
+                                        
+                                        // Stop bleed on Saturday
+                                        if (dayOfWeek === 6 && !multiClass.includes('end')) {
+                                            // Keep it within the cell visually if it's the end of the row
+                                            // But CSS negative margin is global. We handle this with overflow:hidden on card.
+                                        }
+
+                                        if (t.dayIndex > 0) content = '&nbsp;';
                                     }
-                                    return `<div class="task-preview ${t.completed ? 'completed' : ''} ${multiClass}">${t.completed ? '✔ ' : ''}${t.text}</div>`;
+                                    return `<div class="task-preview ${t.completed ? 'completed' : ''} ${multiClass}">${content}</div>`;
                                 }).join('')}
-                                ${dayTasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color); background:none;">+${dayTasks.length - 3} more</div>` : ''}
+                                ${dayTasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color); background:none; margin:0; padding:0;">+${dayTasks.length - 3} more</div>` : ''}
                             </div>
                         `;
                     }).join('')}
