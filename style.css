@@ -63,9 +63,15 @@ body {
   margin: 0 auto;
   padding: var(--spacing-md);
   width: 100%;
-  flex-grow: 1; /* Allow container to grow */
-  display: flex; /* Flex to manage children */
+  flex-grow: 1;
+  display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: var(--spacing-sm);
+  }
 }
 
 /* Ensure app view takes full height */
@@ -78,11 +84,16 @@ button {
   cursor: pointer;
   border: none;
   font-family: inherit;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:hover {
   opacity: 0.8;
+}
+
+button:active {
+    transform: scale(0.98);
 }
 
 input, textarea {
@@ -91,7 +102,8 @@ input, textarea {
   background: var(--surface-color);
   color: var(--text-color);
   padding: var(--spacing-sm);
-  border-radius: 4px;
+  border-radius: 8px;
+  font-size: 16px; /* Prevent iOS auto-zoom */
 }
 
 input:focus, textarea:focus {
@@ -110,15 +122,22 @@ input:focus, textarea:focus {
 /* Split Layout */
 #main-content {
   display: grid;
-  grid-template-columns: 2fr 1.2fr; /* Calendar wider than Daily Panel */
+  grid-template-columns: 1.8fr 1fr;
   gap: var(--spacing-lg);
   align-items: start;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   #main-content {
     grid-template-columns: 1fr;
+    gap: var(--spacing-md);
   }
+}
+
+@media (max-width: 600px) {
+    #main-content {
+        gap: 10px;
+    }
 }
 
 h1, h2, h3 {
