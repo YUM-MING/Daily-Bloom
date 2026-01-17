@@ -1657,8 +1657,18 @@ class DailyView extends BaseComponent {
         // ... (rest of the suggestion logic etc) ...
         const taskInput = this.shadowRoot.getElementById('task-input');
         const suggestionsBox = this.shadowRoot.getElementById('suggestions');
+        const addTaskBtn = this.shadowRoot.getElementById('add-task-btn');
+
+        const handleAddTask = () => {
+            if (taskInput && taskInput.value.trim()) {
+                store.addTask(dateStr, taskInput.value.trim());
+                taskInput.value = '';
+                if(suggestionsBox) suggestionsBox.classList.remove('active');
+            }
+        };
+
         if(taskInput) {
-            taskInput.addEventListener('keypress', (e) => { if(e.key==='Enter') { const input = this.shadowRoot.getElementById('task-input'); if (input.value.trim()) { store.addTask(dateStr, input.value.trim()); input.value = ''; } } });
+            taskInput.addEventListener('keypress', (e) => { if(e.key==='Enter') handleAddTask(); });
             taskInput.addEventListener('input', (e) => {
                 const val = e.target.value;
                 const lastAt = val.lastIndexOf('@');
@@ -1681,6 +1691,10 @@ class DailyView extends BaseComponent {
                     } else { suggestionsBox.classList.remove('active'); }
                 } else { suggestionsBox.classList.remove('active'); }
             });
+        }
+
+        if(addTaskBtn) {
+            addTaskBtn.addEventListener('click', handleAddTask);
         }
     }
 }customElements.define('daily-view', DailyView);
