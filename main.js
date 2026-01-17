@@ -1219,31 +1219,41 @@ class CalendarView extends BaseComponent {
                     position: relative; 
                     box-sizing: border-box;
                     z-index: 1;
-                    transition: transform 0.1s;
+                    transition: all 0.2s;
+                    --bar-bg: var(--primary-color);
+                    --bar-color: var(--on-primary);
                 }
-                .task-preview.completed { text-decoration: line-through; opacity: 0.5; color: var(--accent-color); }
+                .task-preview.completed { 
+                    text-decoration: line-through; 
+                    color: var(--accent-color); 
+                    opacity: 0.7; /* Reduced opacity for text and single items */
+                    --bar-bg: #ffe0e6; /* Lighter solid pink for completed multi-day bars to avoid overlap darkening */
+                }
                 
                 /* Multi-day task styling - Ultra-smooth connection */
                 .task-preview.multi-day { 
-                    background: var(--primary-color); 
-                    color: var(--on-primary); 
+                    background: var(--bar-bg); 
+                    color: var(--bar-color); 
                     border-radius: 0; 
-                    /* Bridge own padding + gap + next cell padding + extra 2px for overlap */
                     width: calc(100% + 26px); 
                     margin-left: -8px; 
                     margin-right: -18px; 
                     padding-left: 8px;
                     font-weight: 600;
                     z-index: 2;
-                    /* Use shadow to bleed color perfectly into gaps */
-                    box-shadow: 4px 0 0 var(--primary-color), -4px 0 0 var(--primary-color);
+                    box-shadow: 4px 0 0 var(--bar-bg), -4px 0 0 var(--bar-bg);
+                    opacity: 1 !important; /* Force full opacity to prevent stacking artifacts */
+                }
+                .task-preview.multi-day.completed {
+                    color: var(--accent-color);
+                    text-decoration: line-through;
                 }
                 .task-preview.multi-day.start { 
                     border-top-left-radius: 11px; 
                     border-bottom-left-radius: 11px; 
                     margin-left: 0; 
                     width: calc(100% + 18px);
-                    box-shadow: 4px 0 0 var(--primary-color);
+                    box-shadow: 4px 0 0 var(--bar-bg);
                 }
                 .task-preview.multi-day.end { 
                     border-top-right-radius: 11px; 
@@ -1252,7 +1262,7 @@ class CalendarView extends BaseComponent {
                     margin-right: 0; 
                     width: calc(100% + 8px);
                     padding-right: 8px;
-                    box-shadow: -4px 0 0 var(--primary-color);
+                    box-shadow: -4px 0 0 var(--bar-bg);
                 }
                 .task-preview.multi-day.no-bleed {
                     width: calc(100% + 8px) !important;
