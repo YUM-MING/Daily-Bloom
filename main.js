@@ -623,6 +623,12 @@ class Store extends EventTarget {
       });
   }
 
+  async deleteComment(commentId) {
+      if(!this.state.user) return;
+      if(!confirm("이 블룸을 삭제할까요?")) return;
+      await deleteDoc(doc(db, "comments", commentId));
+  }
+
   async deleteGoal(goalId) {
       if(this.state.viewingUser) return;
       if(!confirm("이 목표를 삭제할까요?")) return;
@@ -917,10 +923,10 @@ class AppHeader extends BaseComponent {
         </div>
         
         ${store.state.viewingUser ? `
-            <div style="flex-grow: 1; text-align: center; background: var(--primary-color); color: white; padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 193, 204, 0.3);">
-                <img src="${store.state.viewingUser.photoURL || '/assets/logo.svg'}" style="width:24px; height:24px; border-radius:50%; border: 1px solid white; object-fit: cover;">
-                ${store.state.viewingUser.nickname}'s Bloom
-                <button class="btn-primary" id="home-btn" style="margin-left:10px; font-size:0.7rem; padding:4px 8px; background:white; color:var(--primary-color); border-radius: 12px; font-weight: bold;">Back Home</button>
+            <div style="flex-grow: 1; text-align: center; color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <img src="${store.state.viewingUser.photoURL || '/assets/logo.svg'}" style="width:28px; height:28px; border-radius:50%; border: 2px solid var(--primary-color); object-fit: cover;">
+                <span>${store.state.viewingUser.nickname}'s Bloom</span>
+                <button class="btn-primary" id="home-btn" style="margin-left:10px; font-size:0.7rem; padding:4px 10px;">Back Home</button>
             </div>
         ` : (store.state.user ? `
             <div class="search-container" id="search-container">
@@ -1228,7 +1234,7 @@ class CalendarView extends BaseComponent {
                 .task-preview.completed { 
                     color: var(--accent-color); 
                     opacity: 0.7;
-                    --bar-bg: #ffe0e6;
+                    --bar-bg: var(--completed-bar-bg);
                 }
                 .task-preview.completed span {
                     text-decoration: line-through;
@@ -1273,7 +1279,7 @@ class CalendarView extends BaseComponent {
                 .task-preview.multi-day.no-bleed {
                     width: calc(100% + 8px) !important;
                     margin-right: -8px !important;
-                    box-shadow: -4px 0 0 var(--primary-color); /* Cut shadow on Saturday edge */
+                    box-shadow: -4px 0 0 var(--bar-bg); 
                 }
                 .task-preview.multi-day.single { 
                     border-radius: 11px; 
@@ -1283,19 +1289,80 @@ class CalendarView extends BaseComponent {
                     box-shadow: none;
                 }
 
-                .title-clickable { cursor: pointer; padding: 4px 12px; border-radius: 12px; transition: all 0.2s; font-size: 1.5rem; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+                .title-clickable { cursor: pointer; padding: 4px 12px; border-radius: 12px; transition: all 0.2s; font-size: 1.5rem; font-weight: bold; display: flex; align-items: center; gap: 8px; user-select: none; }
                 .title-clickable:hover { background: rgba(255, 193, 204, 0.2); color: var(--primary-hover); }
                 .title-clickable::after { content: '▾'; font-size: 0.8rem; opacity: 0.5; }
+
+                /* Jump Picker UI - Robust Fix */
+                .jump-overlay {
+                    position: absolute;
+                    top: calc(100% + 5px);
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 320px;
+                    background: var(--surface-color);
+                    border: 1px solid var(--border-color);
+                    border-radius: 16px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    padding: 20px;
+                    z-index: 1000;
+                    display: none;
+                    flex-direction: column;
+                    gap: 15px;
+                    animation: slideDown 0.2s ease-out;
+                }
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+                }
+                .picker-section { display: flex; flex-direction: column; gap: 10px; }
+                .picker-label { font-size: 0.7rem; font-weight: bold; color: var(--primary-hover); text-transform: uppercase; letter-spacing: 1px; }
+                .picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+                .picker-item {
+                    padding: 8px 0;
+                    text-align: center;
+                    border-radius: 10px;
+                    border: 1px solid var(--border-color);
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    background: var(--bg-color);
+                    color: var(--text-color);
+                }
+                .picker-item:hover { border-color: var(--primary-color); background: var(--surface-color); }
+                .picker-item.active { background: var(--primary-color); color: white; border-color: var(--primary-color); font-weight: bold; }
+                
+                .year-scroll { 
+                    display: flex; 
+                    gap: 8px; 
+                    overflow-x: auto; 
+                    padding-bottom: 8px; 
+                    scrollbar-width: thin; 
+                    scrollbar-color: var(--primary-color) transparent;
+                }
+                .year-item { 
+                    flex-shrink: 0; 
+                    padding: 6px 15px; 
+                    border-radius: 20px; 
+                    border: 1px solid var(--border-color); 
+                    font-size: 0.9rem; 
+                    cursor: pointer; 
+                    transition: all 0.2s; 
+                    background: var(--bg-color);
+                    color: var(--text-color);
+                }
+                .year-item:hover { border-color: var(--primary-color); }
+                .year-item.active { background: var(--primary-color); color: white; border-color: var(--primary-color); font-weight: bold; }
             </style>
-            <div class="card" style="overflow: hidden;">
+            <div class="card" style="overflow: visible;">
                 <div class="calendar-header">
                     <button id="prev-btn" class="nav-btn">‹</button>
                     
-                    <div id="title-container" style="position: relative;">
+                    <div id="title-container" style="position: relative; z-index: 100;">
                         <h2 id="title-display" class="title-clickable">${year}. ${String(month + 1).padStart(2, '0')}</h2>
                         
                         ${this.isJumping ? `
-                            <div class="jump-overlay" id="jump-overlay">
+                            <div class="jump-overlay" id="jump-overlay" style="display: flex;">
                                 <div class="picker-section">
                                     <div class="picker-label">Select Year</div>
                                     <div class="year-scroll">
@@ -1465,19 +1532,24 @@ class DailyView extends BaseComponent {
                 <div class="section-title">${taskTitle}</div>
                 <div id="task-list">
                     ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${store.t.noTasks}</p>` : ''}
-                    ${tasks.map((t, index) => `
-                        <div class="task-item" draggable="true" data-index="${index}" style="display:flex; align-items:center; gap:12px; cursor:grab; padding: 8px 0;">
-                            <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}">
-                            <span style="flex-grow:1" class="${t.completed ? 'completed' : ''}">${t.text}</span>
-                            <button class="delete-btn" data-id="${t.id}" style="color:red; background:none; font-size: 1.2rem; cursor: pointer;">×</button>
+                    ${tasks.map((t, index) => {
+                        const isMulti = t.duration && t.duration > 1;
+                        return `
+                        <div class="task-item" draggable="${!viewingUser}" data-index="${index}" style="display:flex; align-items:center; gap:12px; cursor:${viewingUser ? 'default' : 'grab'}; padding: 8px 0;">
+                            <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}" ${viewingUser ? 'disabled' : ''}>
+                            <span style="flex-grow:1" class="${t.completed ? 'completed' : ''}">${t.text}${isMulti ? ' (Multiple)' : ''}</span>
+                            ${!viewingUser ? `<button class="delete-btn" data-id="${t.id}" style="color:red; background:none; font-size: 1.2rem; cursor: pointer;">×</button>` : ''}
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
-                <div class="input-group">
-                    <input type="text" id="task-input" placeholder="${store.t.addTask}" style="flex-grow:1" autocomplete="off">
-                    <button class="btn-primary" id="add-task-btn">+</button>
-                    <div class="friend-suggestions" id="suggestions"></div>
-                </div>
+                ${!viewingUser ? `
+                    <div class="input-group">
+                        <input type="text" id="task-input" placeholder="${store.t.addTask}" style="flex-grow:1" autocomplete="off">
+                        <button class="btn-primary" id="add-task-btn">+</button>
+                        <div class="friend-suggestions" id="suggestions"></div>
+                    </div>
+                ` : ''}
 
                 <div class="section-title" style="margin-top: 20px;">${store.t.commentsTitle}</div>
                 <div id="comment-list" style="overflow-y:auto; max-height: 200px;">

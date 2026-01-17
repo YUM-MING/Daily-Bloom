@@ -10,6 +10,7 @@
   --on-primary: #333333;
 
   --accent-color: #555555;
+  --completed-bar-bg: #ffe0e6;
   
   /* Spacing */
   --spacing-sm: 8px;
@@ -35,6 +36,7 @@
   --on-primary: #121212;
 
   --accent-color: #ffffff;
+  --completed-bar-bg: #4a2a32;
   --icon-filter: invert(1);
 }
 
