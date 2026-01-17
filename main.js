@@ -1222,12 +1222,16 @@ class CalendarView extends BaseComponent {
                     transition: all 0.2s;
                     --bar-bg: var(--primary-color);
                     --bar-color: var(--on-primary);
+                    display: flex;
+                    align-items: center;
                 }
                 .task-preview.completed { 
-                    text-decoration: line-through; 
                     color: var(--accent-color); 
-                    opacity: 0.7; /* Reduced opacity for text and single items */
-                    --bar-bg: #ffe0e6; /* Lighter solid pink for completed multi-day bars to avoid overlap darkening */
+                    opacity: 0.7;
+                    --bar-bg: #ffe0e6;
+                }
+                .task-preview.completed span {
+                    text-decoration: line-through;
                 }
                 
                 /* Multi-day task styling - Ultra-smooth connection */
@@ -1242,10 +1246,12 @@ class CalendarView extends BaseComponent {
                     font-weight: 600;
                     z-index: 2;
                     box-shadow: 4px 0 0 var(--bar-bg), -4px 0 0 var(--bar-bg);
-                    opacity: 1 !important; /* Force full opacity to prevent stacking artifacts */
+                    opacity: 1 !important;
                 }
                 .task-preview.multi-day.completed {
                     color: var(--accent-color);
+                }
+                .task-preview.multi-day.completed span {
                     text-decoration: line-through;
                 }
                 .task-preview.multi-day.start { 
@@ -1329,20 +1335,23 @@ class CalendarView extends BaseComponent {
                                 ${dayTasks.slice(0, 3).map(t => {
                                     const isMulti = t.duration && t.duration > 1;
                                     let multiClass = '';
-                                    let content = (t.completed ? '✔ ' : '') + t.text;
+                                    let taskText = t.text;
                                     
                                     if (isMulti) {
                                         multiClass = 'multi-day';
                                         if (t.dayIndex === 0) multiClass += ' start';
                                         else if (t.dayIndex === t.duration - 1) multiClass += ' end';
                                         
-                                        // Stop bleed on Saturday
                                         if (dayOfWeek === 6 && !multiClass.includes('end')) {
                                             multiClass += ' no-bleed';
                                         }
 
-                                        if (t.dayIndex > 0) content = '&nbsp;';
+                                        if (t.dayIndex > 0) taskText = '';
                                     }
+
+                                    const checkmark = t.completed ? '✔ ' : '';
+                                    const content = taskText ? `<span>${checkmark}${taskText}</span>` : (isMulti ? '&nbsp;' : `<span>${checkmark}</span>`);
+
                                     return `<div class="task-preview ${t.completed ? 'completed' : ''} ${multiClass}">${content}</div>`;
                                 }).join('')}
                                 ${dayTasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color); background:none; margin:0; padding:0;">+${dayTasks.length - 3} more</div>` : ''}
