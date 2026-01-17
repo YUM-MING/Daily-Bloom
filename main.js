@@ -1,5 +1,5 @@
 
-import { auth, provider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, db, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, addDoc, onSnapshot } from './firebase-config.js';
+import { auth, provider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, db, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, addDoc, onSnapshot, deleteDoc } from './firebase-config.js';
 
 /**
  * Localization Data
@@ -11,8 +11,8 @@ const TRANSLATIONS = {
     goalsTitle: "Monthly Goals",
     addGoal: "Add Goal",
     addTask: "Add Task (@friend to share)",
-    commentsTitle: "Friend Comments",
-    addComment: "Leave a comment...",
+    commentsTitle: "Bloom",
+    addComment: "Leave a bloom...",
     send: "Send",
     toggleTheme: "Toggle Theme",
     toggleLang: "한국어",
@@ -37,8 +37,8 @@ const TRANSLATIONS = {
     goalsTitle: "이달의 목표",
     addGoal: "목표 추가",
     addTask: "할 일 추가 (@친구 태그)",
-    commentsTitle: "친구들의 응원",
-    addComment: "응원 댓글 남기기...",
+    commentsTitle: "블룸(Bloom)",
+    addComment: "응원 남기기...",
     send: "전송",
     toggleTheme: "테마 변경",
     toggleLang: "English",
@@ -190,7 +190,14 @@ class Store extends EventTarget {
   }
 
   selectDate(date) {
-    this.setState({ selectedDate: date });
+    if (date) {
+        // Parse "YYYY-MM-DD" carefully to avoid timezone shifts
+        const [year, month, day] = date.split('-').map(Number);
+        const d = new Date(year, month - 1, day);
+        this.setState({ selectedDate: date, currentDate: d });
+    } else {
+        this.setState({ selectedDate: null });
+    }
   }
 
   prevMonth() {
@@ -213,7 +220,7 @@ class Store extends EventTarget {
   }
 
   goHome() {
-      this.setState({ viewingUser: null, selectedDate: null });
+      this.setState({ viewingUser: null, selectedDate: null, currentDate: new Date() });
       this.loadTasks(); 
       this.loadGoals();
   }
@@ -255,13 +262,14 @@ class Store extends EventTarget {
       await updateDoc(doc(db, "notifications", id), { read: true });
   }
 
-  async sendNotification(toUserId, type, message, senderEmail = null) {
+  async sendNotification(toUserId, type, message, senderEmail = null, date = null) {
       await addDoc(collection(db, "notifications"), {
           toUserId,
           fromUser: this.state.user.nickname,
           senderEmail: senderEmail || this.state.user.email, // Add email for bloom back
           type, // 'bloom', 'comment', 'tag'
           message,
+          date, // Navigation target
           read: false,
           createdAt: new Date().toISOString()
       });
@@ -370,15 +378,23 @@ class Store extends EventTarget {
     }
     if(!this.state.user) return;
 
-    const tagMatch = text.match(/@(\S+)/);
+    // Parse #d{n} (Duration) and #w{n} (Weekly Repeat)
+    const durationMatch = text.match(/#d(\d+)/);
+    const weeklyMatch = text.match(/#w(\d+)/);
+    let duration = durationMatch ? parseInt(durationMatch[1]) : 1;
+    let weeks = weeklyMatch ? parseInt(weeklyMatch[1]) : 1;
+    
+    // Clean text from tags
+    let cleanText = text.replace(/#d\d+/, '').replace(/#w\d+/, '').trim();
+
+    const tagMatch = cleanText.match(/@(\S+)/);
     let taggedUid = null;
-    let cleanText = text;
-    let formattedText = text;
+    let formattedText = cleanText;
 
     if (tagMatch) {
         const taggedName = tagMatch[1];
-        cleanText = text.replace(`@${taggedName}`, '').trim(); // Remove @Name from text
-        formattedText = `${cleanText} (with ${taggedName})`; // Format for myself
+        cleanText = cleanText.replace(`@${taggedName}`, '').trim();
+        formattedText = `${cleanText} (with ${taggedName})`;
 
         const friend = this.state.blooms.find(b => b.nickname === taggedName);
         if (friend) {
@@ -390,39 +406,67 @@ class Store extends EventTarget {
         }
     }
 
-    const newTask = {
-        text: formattedText, // Save formatted text for myself
-        date: dateStr,
-        userId: this.state.user.uid,
-        completed: false,
-        createdAt: new Date().toISOString()
-    };
-    
-    // Optimistic Update
-    const currentTasks = this.state.tasks[dateStr] || [];
-    const tempId = 'temp-' + Date.now();
-    const optimisticTask = { id: tempId, ...newTask };
-    
-    const updatedTasks = { ...this.state.tasks, [dateStr]: [...currentTasks, optimisticTask] };
-    this.setState({ tasks: updatedTasks });
+    const groupId = 'group-' + Date.now();
+    const baseDate = new Date(dateStr);
 
-    try {
-        await addDoc(collection(db, "tasks"), newTask);
-    } catch (e) {
-        console.error("Failed to add task:", e);
+    const tasksToAdd = [];
+    
+    // Logic for #d (Consecutive days)
+    if (duration > 1) {
+        for (let i = 0; i < duration; i++) {
+            const d = new Date(baseDate);
+            d.setDate(d.getDate() + i);
+            const dStr = d.toISOString().split('T')[0];
+            tasksToAdd.push({ date: dStr, text: formattedText, duration, dayIndex: i });
+        }
+    } 
+    // Logic for #w (Weekly repeat)
+    else if (weeks > 1) {
+        for (let i = 0; i < weeks; i++) {
+            const d = new Date(baseDate);
+            d.setDate(d.getDate() + (i * 7));
+            const dStr = d.toISOString().split('T')[0];
+            tasksToAdd.push({ date: dStr, text: formattedText, isWeekly: true });
+        }
+    }
+    // Normal single day
+    else {
+        tasksToAdd.push({ date: dateStr, text: formattedText });
     }
 
-    if (taggedUid) {
-        await addDoc(collection(db, "tasks"), {
-            ...newTask,
-            userId: taggedUid,
-            text: `${cleanText} (with ${this.state.user.nickname})` // Format for friend: "Task (with Me)"
-        });
-        
-        await this.sendNotification(taggedUid, 'tag', `${this.state.user.nickname}님이 일정에 회원님을 태그했습니다: ${cleanText}`);
-        
-        alert(`Shared event with @${tagMatch[1]}!`);
+    for (const taskData of tasksToAdd) {
+        const newTask = {
+            text: taskData.text,
+            date: taskData.date,
+            userId: this.state.user.uid,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            groupId,
+            duration: taskData.duration || 1,
+            dayIndex: taskData.dayIndex ?? -1
+        };
+
+        try {
+            await addDoc(collection(db, "tasks"), newTask);
+            
+            if (taggedUid) {
+                await addDoc(collection(db, "tasks"), {
+                    ...newTask,
+                    userId: taggedUid,
+                    text: `${cleanText} (with ${this.state.user.nickname})`
+                });
+                
+                // Only send notification for the first day to avoid spam
+                if (taskData.date === dateStr) {
+                    await this.sendNotification(taggedUid, 'tag', `${this.state.user.nickname}님이 일정에 회원님을 태그했습니다: ${cleanText}`, null, dateStr);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to add task:", e);
+        }
     }
+
+    if (taggedUid) alert(`Shared events with @${tagMatch[1]}!`);
   }
 
   async reorderTasks(dateStr, reorderedTasks) {
@@ -473,21 +517,79 @@ class Store extends EventTarget {
         await updateDoc(doc(db, "goals", goalId), { completed: !goal.completed });
     }
   }
+
+  searchTasks(queryText) {
+    if (!queryText.trim()) return [];
+    const results = [];
+    const q = queryText.toLowerCase().trim();
+    
+    for (const date in this.state.tasks) {
+      this.state.tasks[date].forEach(task => {
+        const text = task.text.toLowerCase();
+        let score = 0;
+        
+        if (text.includes(q)) {
+            score = 1.0;
+        } else {
+            // Fuzzy match: check if characters appear in order
+            let qIdx = 0;
+            let matches = 0;
+            for (let i = 0; i < text.length && qIdx < q.length; i++) {
+                if (text[i] === q[qIdx]) {
+                    qIdx++;
+                    matches++;
+                }
+            }
+            score = matches / q.length;
+            // Penalize length difference slightly
+            score = score * (1 - Math.min(0.5, Math.abs(text.length - q.length) / 100));
+        }
+
+        if (score > 0.6) { // Threshold for relevance
+          results.push({ ...task, date, score });
+        }
+      });
+    }
+    
+    // Sort by score then by date (newest first)
+    return results.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(b.date) - new Date(a.date);
+    }).slice(0, 8);
+  }
   
+  async visitUserByUid(uid) {
+      if (this.state.user && uid === this.state.user.uid) {
+          this.goHome();
+          return;
+      }
+      const docSnap = await getDoc(doc(db, "users", uid));
+      if(docSnap.exists()) {
+          this.visitFriend({ uid, ...docSnap.data() });
+      } else {
+          alert("User not found!");
+      }
+  }
+
   async loadComments(dateStr) {
       if(!this.state.user) return;
-      // Comments logic needs to handle viewing user. If viewing friend, we need comments ON FRIEND'S date.
-      // Assuming comments have `toUserId` field.
       const targetUid = this.state.viewingUser ? this.state.viewingUser.uid : this.state.user.uid;
+      const key = `${targetUid}_${dateStr}`;
+
+      // Prevent duplicate listeners
+      if (!this.activeCommentListeners) this.activeCommentListeners = new Set();
+      if (this.activeCommentListeners.has(key)) return;
+      this.activeCommentListeners.add(key);
       
       const q = query(collection(db, "comments"), where("toUserId", "==", targetUid), where("date", "==", dateStr));
       onSnapshot(q, (snapshot) => {
-          const comments = {};
           const dateComments = [];
           snapshot.forEach(doc => dateComments.push({id: doc.id, ...doc.data()}));
+          // Sort by creation time
+          dateComments.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
           
           const allComments = { ...this.state.comments };
-          allComments[dateStr] = dateComments;
+          allComments[key] = dateComments;
           this.setState({ comments: allComments });
       });
   }
@@ -501,12 +603,28 @@ class Store extends EventTarget {
           toUserId: targetUid, 
           fromUserId: this.state.user.uid,
           author: this.state.user.nickname,
-          text
+          authorPhoto: this.state.user.photoURL,
+          text,
+          createdAt: new Date().toISOString()
       });
       
       if(targetUid !== this.state.user.uid) {
-          await this.sendNotification(targetUid, 'comment', `${this.state.user.nickname}님이 회원님의 달력에 댓글을 남겼습니다!`);
+          await this.sendNotification(targetUid, 'comment', `${this.state.user.nickname}님이 회원님의 달력(${dateStr})에 블룸을 남겼습니다!`, null, dateStr);
       }
+  }
+
+  async updateComment(commentId, newText) {
+      if(!this.state.user) return;
+      await updateDoc(doc(db, "comments", commentId), {
+          text: newText,
+          updatedAt: new Date().toISOString()
+      });
+  }
+
+  async deleteGoal(goalId) {
+      if(this.state.viewingUser) return;
+      if(!confirm("이 목표를 삭제할까요?")) return;
+      await deleteDoc(doc(db, "goals", goalId));
   }
 }
 
@@ -697,16 +815,68 @@ class AppHeader extends BaseComponent {
           padding: 20px 0;
           margin-bottom: 20px;
           position: relative;
+          gap: 15px;
         }
-        .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-shrink: 0; }
         .logo-icon { height: 40px; width: 40px; }
         .logo-text { font-family: 'Dancing Script', cursive; font-size: 2rem; font-weight: 700; color: var(--primary-color); margin-top: 5px; }
+        
+        .search-container {
+            position: relative;
+            flex-grow: 1;
+            max-width: 400px;
+            display: none;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .search-container.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: var(--surface-color);
+            color: var(--text-color);
+            outline: none;
+        }
+        .search-results {
+            position: absolute;
+            top: 110%;
+            left: 0;
+            width: 100%;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1000;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .search-results.active { display: block; }
+        .search-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover { background: var(--bg-color); }
+        .search-item-text { font-weight: 600; font-size: 0.95rem; }
+        .search-item-date { font-size: 0.8rem; color: var(--primary-color); margin-top: 4px; }
+
         .controls { 
             display: flex; 
             gap: 12px; 
             z-index: 1; 
             align-items: center; 
             height: 40px; 
+            flex-shrink: 0;
         }
         .avatar-small { 
             width: 36px; 
@@ -722,7 +892,10 @@ class AppHeader extends BaseComponent {
             justify-content: center;
             height: 40px; 
         }
-        #theme-btn {
+        .btn-icon {
+            width: 40px; 
+            height: 40px; 
+            padding: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -742,35 +915,48 @@ class AppHeader extends BaseComponent {
         </div>
         
         ${store.state.viewingUser ? `
-            <div style="flex-grow:1; text-align:center; color: var(--primary-color); font-weight:bold;">
-                Visiting: ${store.state.viewingUser.nickname}
-                <button class="btn-primary" id="home-btn" style="margin-left:10px; font-size:0.8rem; padding:4px 10px;">Return Home</button>
+            <div style="flex-grow: 1; text-align: center; background: var(--primary-color); color: white; padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 193, 204, 0.3);">
+                <img src="${store.state.viewingUser.photoURL || '/assets/logo.svg'}" style="width:24px; height:24px; border-radius:50%; border: 1px solid white; object-fit: cover;">
+                ${store.state.viewingUser.nickname}'s Bloom
+                <button class="btn-primary" id="home-btn" style="margin-left:10px; font-size:0.7rem; padding:4px 8px; background:white; color:var(--primary-color); border-radius: 12px; font-weight: bold;">Back Home</button>
             </div>
-        ` : ''}
+        ` : (store.state.user ? `
+            <div class="search-container" id="search-container">
+                <input type="text" class="search-input" id="search-input" placeholder="${strings.searchPlaceholder}" autocomplete="off">
+                <div class="search-results" id="search-results"></div>
+            </div>
+        ` : '')}
         
         <div class="controls">
-            <button class="btn-icon" id="theme-btn" style="width:40px; height:40px; padding:8px;">
+            ${store.state.user && !store.state.viewingUser ? `
+                <button class="btn-icon" id="search-toggle-btn">
+                    <img src="/assets/search.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
+                </button>
+            ` : ''}
+            
+            <button class="btn-icon" id="theme-btn">
                 <img src="/assets/moon.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
             </button>
 
             ${store.state.user ? `
                 <div class="notification-wrapper">
-                    <button class="btn-icon" id="noti-btn" style="width:40px; height:40px; padding:8px;">
+                    <button class="btn-icon" id="noti-btn">
                         <img src="/assets/bell.svg" style="width:100%; height:100%; filter: var(--icon-filter);">
                         ${store.state.notifications.length > 0 ? `<div class="noti-badge">${store.state.notifications.length}</div>` : ''}
                     </button>
                     <div class="noti-dropdown" id="noti-dropdown">
                         ${store.state.notifications.length === 0 ? '<div style="padding:20px; text-align:center; opacity:0.6;">No notifications</div>' : ''}
                         ${store.state.notifications.map(n => `
-                            <div class="noti-item" data-id="${n.id}" data-type="${n.type}" data-email="${n.senderEmail || ''}">
-                                <strong>${n.type === 'bloom' ? '🌸 Bloom' : n.type === 'tag' ? '📌 Tag' : '💬 Comment'}</strong><br>
+                            <div class="noti-item" data-id="${n.id}">
+                                <strong>${n.type === 'bloom' ? '🌸 Bloom' : n.type === 'tag' ? '📌 Tag' : '💬 Bloom'}</strong><br>
                                 ${n.message}
+                                ${n.date ? `<div style="font-size:0.7rem; color:var(--primary-color); margin-top:4px;">Date: ${n.date}</div>` : ''}
                             </div>
                         `).join('')}
                     </div>
                 </div>
                 <div class="profile-trigger" id="mypage-btn">
-                    <img src="${store.state.user.photoURL || '/assets/logo.svg'}" class="avatar-small">
+                    <img src="${user.photoURL || '/assets/logo.svg'}" class="avatar-small">
                 </div>
             ` : ''}
             
@@ -778,6 +964,60 @@ class AppHeader extends BaseComponent {
         </div>
       </header>
     `;
+
+    // Search Logic
+    // ... (omitted for brevity in instruction, but keeping it in the replacement) ...
+    const searchInput = this.shadowRoot.getElementById('search-input');
+    const searchResults = this.shadowRoot.getElementById('search-results');
+    const searchContainer = this.shadowRoot.getElementById('search-container');
+    const searchToggleBtn = this.shadowRoot.getElementById('search-toggle-btn');
+
+    if (searchToggleBtn) {
+        searchToggleBtn.addEventListener('click', () => {
+            searchContainer.classList.toggle('active');
+            if (searchContainer.classList.contains('active')) {
+                searchInput.focus();
+            } else {
+                searchResults.classList.remove('active');
+                searchInput.value = '';
+            }
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            const results = store.searchTasks(query);
+            if (results.length > 0) {
+                searchResults.innerHTML = results.map(r => `
+                    <div class="search-item" data-date="${r.date}">
+                        <div class="search-item-text">${r.text}</div>
+                        <div class="search-item-date">${r.date}</div>
+                    </div>
+                `).join('');
+                searchResults.classList.add('active');
+                
+                // Add click events for results
+                searchResults.querySelectorAll('.search-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        store.selectDate(item.dataset.date);
+                        searchResults.classList.remove('active');
+                        searchContainer.classList.remove('active');
+                        searchInput.value = '';
+                    });
+                });
+            } else {
+                searchResults.classList.remove('active');
+            }
+        });
+
+        // Close search on click outside
+        document.addEventListener('click', (e) => {
+            if (!this.shadowRoot.contains(e.target)) {
+                if (searchResults) searchResults.classList.remove('active');
+            }
+        });
+    }
 
     const homeBtn = this.shadowRoot.getElementById('home-btn');
     if(homeBtn) {
@@ -796,33 +1036,40 @@ class AppHeader extends BaseComponent {
         
         this.shadowRoot.querySelectorAll('.noti-item').forEach(item => {
             item.addEventListener('click', () => {
-                store.markNotificationRead(item.dataset.id);
-                const type = item.dataset.type;
-                const email = item.dataset.email;
+                const id = item.dataset.id;
+                const n = store.state.notifications.find(noti => noti.id === id);
+                if(!n) return;
 
-                if (type === 'bloom') {
+                store.markNotificationRead(id);
+                
+                if (n.type === 'bloom') {
                     // Open MyPage and fill email
                     document.querySelector('my-page').classList.remove('hidden');
                     document.getElementById('main-content').classList.add('hidden');
                     document.querySelector('goal-list').classList.add('hidden');
                     
-                    // Delay slightly to ensure render
                     setTimeout(() => {
                         const myPage = document.querySelector('my-page');
                         const emailInput = myPage.shadowRoot.getElementById('friend-email');
                         if(emailInput) {
-                            emailInput.value = email;
+                            emailInput.value = n.senderEmail || '';
                             emailInput.focus();
-                            alert(`Paste this email to Bloom back: ${email}`); // Temporary hint as auto-fill might be tricky across shadow DOM boundaries if not rendered yet
+                            alert(`Paste this email to Bloom back: ${n.senderEmail}`);
                         }
                     }, 100);
+                } else if (n.type === 'comment' || n.type === 'tag') {
+                    if (store.state.viewingUser) store.goHome(); // Return to my calendar first
+                    if (n.date) {
+                        store.selectDate(n.date);
+                    }
+                    notiDropdown.classList.remove('active');
                 }
             });
         });
     }
 
     this.shadowRoot.getElementById('logo').addEventListener('click', () => {
-        store.selectDate(null);
+        store.goHome();
         document.querySelector('my-page').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
         document.querySelector('goal-list').classList.remove('hidden');
@@ -843,9 +1090,19 @@ customElements.define('app-header', AppHeader);
 
 class GoalList extends BaseComponent {
     render() {
-        const date = store.state.currentDate;
-        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const goals = store.state.goals[monthStr] || [];
+        const { currentDate, goals, viewingUser, lang } = store.state;
+        const monthStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        const currentGoals = goals[monthStr] || [];
+        const t = store.t;
+
+        let title = `${t.goalsTitle} (${monthStr})`;
+        if (viewingUser) {
+            if (lang === 'ko') {
+                title = `${viewingUser.nickname}의 목표 (${monthStr})`;
+            } else {
+                title = `${viewingUser.nickname}'s Goals (${monthStr})`;
+            }
+        }
 
         this.shadowRoot.innerHTML = `
             <style>
@@ -854,44 +1111,59 @@ class GoalList extends BaseComponent {
                 .goal-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
                 .completed { text-decoration: line-through; color: #888; opacity: 0.6; }
                 .add-form { display: flex; gap: 5px; margin-top: 10px; }
+                .delete-goal-btn { background: none; color: #ff5252; cursor: pointer; font-size: 1.1rem; padding: 0 5px; opacity: 0.6; transition: opacity 0.2s; }
+                .delete-goal-btn:hover { opacity: 1; }
             </style>
             <div class="card goal-container">
-                <h3>${store.t.goalsTitle} (${monthStr})</h3>
+                <h3>${title}</h3>
                 <div class="list">
-                    ${goals.length === 0 ? `<p>${store.t.noGoals}</p>` : ''}
-                    ${goals.map(g => `
+                    ${currentGoals.length === 0 ? `<p>${t.noGoals}</p>` : ''}
+                    ${currentGoals.map(g => `
                         <div class="goal-item">
-                            <input type="checkbox" ${g.completed ? 'checked' : ''} data-id="${g.id}">
-                            <span class="${g.completed ? 'completed' : ''}">${g.text}</span>
+                            <input type="checkbox" ${g.completed ? 'checked' : ''} data-id="${g.id}" ${viewingUser ? 'disabled' : ''}>
+                            <span style="flex-grow:1" class="${g.completed ? 'completed' : ''}">${g.text}</span>
+                            ${!viewingUser ? `<button class="delete-goal-btn" data-id="${g.id}">×</button>` : ''}
                         </div>
                     `).join('')}
                 </div>
-                <div class="add-form">
-                    <input type="text" id="goal-input" placeholder="${store.t.addGoal}">
-                    <button class="btn-primary" id="add-btn">+</button>
-                </div>
+                ${!viewingUser ? `
+                    <div class="add-form">
+                        <input type="text" id="goal-input" placeholder="${t.addGoal}">
+                        <button class="btn-primary" id="add-btn">+</button>
+                    </div>
+                ` : ''}
             </div>
         `;
 
-        this.shadowRoot.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', (e) => store.toggleGoal(monthStr, e.target.dataset.id));
-        });
+        if (!viewingUser) {
+            this.shadowRoot.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', (e) => store.toggleGoal(monthStr, e.target.dataset.id));
+            });
 
-        const addBtn = this.shadowRoot.getElementById('add-btn');
-        const input = this.shadowRoot.getElementById('goal-input');
-        const addGoal = () => { if(input.value.trim()) { store.addGoal(monthStr, input.value.trim()); input.value = ''; } };
-        addBtn.addEventListener('click', addGoal);
-        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') addGoal() });
+            this.shadowRoot.querySelectorAll('.delete-goal-btn').forEach(btn => {
+                btn.addEventListener('click', () => store.deleteGoal(btn.dataset.id));
+            });
+
+            const addBtn = this.shadowRoot.getElementById('add-btn');
+            const input = this.shadowRoot.getElementById('goal-input');
+            const addGoal = () => { if(input.value.trim()) { store.addGoal(monthStr, input.value.trim()); input.value = ''; } };
+            addBtn.addEventListener('click', addGoal);
+            input.addEventListener('keypress', (e) => { if(e.key === 'Enter') addGoal() });
+        }
     }
 }
 customElements.define('goal-list', GoalList);
 
 class CalendarView extends BaseComponent {
+    constructor() {
+        super();
+        this.isJumping = false;
+    }
+
     render() {
-        if (store.state.selectedDate) return; 
-        const date = store.state.currentDate;
-        const year = date.getFullYear();
-        const month = date.getMonth();
+        const { currentDate, selectedDate, tasks } = store.state;
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
@@ -901,22 +1173,58 @@ class CalendarView extends BaseComponent {
         this.shadowRoot.innerHTML = `
             <style>
                 @import url('/style.css');
-                .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                .nav-btn { background: none; border: 1px solid var(--border-color); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; color: var(--text-color); display: flex; align-items: center; justify-content: center; }
+                .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative; }
+                .nav-btn { background: none; border: 1px solid var(--border-color); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; color: var(--text-color); display: flex; align-items: center; justify-content: center; z-index: 2; }
                 .nav-btn:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
                 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
                 .day-header { text-align: center; font-weight: bold; color: var(--primary-color); padding: 10px 0; }
                 .day-cell { background: var(--surface-color); min-height: 100px; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; flex-direction: column; border: 1px solid transparent; transition: all 0.2s; overflow: hidden; }
                 .day-cell:hover { border-color: var(--primary-color); transform: translateY(-2px); }
                 .day-number { font-weight: bold; margin-bottom: 5px; }
-                .today { background-color: rgba(233, 30, 99, 0.1); border: 1px solid var(--primary-color); }
-                .task-preview { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; max-width: 100%; }
+                .today { background-color: rgba(233, 30, 99, 0.05); border: 1px solid var(--primary-hover); }
+                .selected { border: 2px solid var(--primary-color); background-color: rgba(255, 193, 204, 0.1); }
+                .task-preview { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; max-width: 100%; padding: 2px 4px; border-radius: 4px; }
                 .task-preview.completed { text-decoration: line-through; opacity: 0.5; color: var(--accent-color); }
+                
+                /* Multi-day task styling */
+                .task-preview.multi-day { background: var(--primary-color); color: var(--on-primary); border-radius: 0; margin-left: -8px; margin-right: -8px; padding-left: 12px; }
+                .task-preview.multi-day.start { border-top-left-radius: 10px; border-bottom-left-radius: 10px; margin-left: 2px; }
+                .task-preview.multi-day.end { border-top-right-radius: 10px; border-bottom-right-radius: 10px; margin-right: 2px; }
+                .task-preview.multi-day.single { border-radius: 10px; margin-left: 2px; margin-right: 2px; }
+
+                .title-clickable { cursor: pointer; padding: 4px 12px; border-radius: 12px; transition: all 0.2s; font-size: 1.5rem; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+                .title-clickable:hover { background: rgba(255, 193, 204, 0.2); color: var(--primary-hover); }
+                .title-clickable::after { content: '▾'; font-size: 0.8rem; opacity: 0.5; }
             </style>
             <div class="card">
                 <div class="calendar-header">
                     <button id="prev-btn" class="nav-btn">‹</button>
-                    <h2>${year}. ${String(month + 1).padStart(2, '0')}</h2>
+                    
+                    <div id="title-container" style="position: relative;">
+                        <h2 id="title-display" class="title-clickable">${year}. ${String(month + 1).padStart(2, '0')}</h2>
+                        
+                        ${this.isJumping ? `
+                            <div class="jump-overlay" id="jump-overlay">
+                                <div class="picker-section">
+                                    <div class="picker-label">Select Year</div>
+                                    <div class="year-scroll">
+                                        ${Array.from({length: 16}, (_, i) => 2020 + i).map(y => `
+                                            <div class="year-item ${y === year ? 'active' : ''}" data-year="${y}">${y}</div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                <div class="picker-section">
+                                    <div class="picker-label">Select Month</div>
+                                    <div class="picker-grid">
+                                        ${Array.from({length: 12}, (_, i) => i).map(m => `
+                                            <div class="picker-item ${m === month ? 'active' : ''}" data-month="${m}">${String(m + 1).padStart(2, '0')}</div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+
                     <button id="next-btn" class="nav-btn">›</button>
                 </div>
                 <div class="calendar-grid">
@@ -926,18 +1234,63 @@ class CalendarView extends BaseComponent {
                         const d = i + 1;
                         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                         const isToday = today.toDateString() === new Date(year, month, d).toDateString();
-                        const tasks = store.state.tasks[dateStr] || [];
+                        const isSelected = selectedDate === dateStr;
+                        const dayTasks = tasks[dateStr] || [];
                         return `
-                            <div class="day-cell ${isToday ? 'today' : ''}" data-date="${dateStr}">
+                            <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}">
                                 <div class="day-number">${d}</div>
-                                ${tasks.slice(0, 3).map(t => `<div class="task-preview ${t.completed ? 'completed' : ''}">${t.completed ? '✔' : '•'} ${t.text}</div>`).join('')}
-                                ${tasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color)">+${tasks.length - 3} more</div>` : ''}
+                                ${dayTasks.slice(0, 3).map(t => {
+                                    const isMulti = t.duration && t.duration > 1;
+                                    let multiClass = '';
+                                    if (isMulti) {
+                                        multiClass = 'multi-day';
+                                        if (t.dayIndex === 0) multiClass += ' start';
+                                        else if (t.dayIndex === t.duration - 1) multiClass += ' end';
+                                    }
+                                    return `<div class="task-preview ${t.completed ? 'completed' : ''} ${multiClass}">${t.completed ? '✔ ' : ''}${t.text}</div>`;
+                                }).join('')}
+                                ${dayTasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color); background:none;">+${dayTasks.length - 3} more</div>` : ''}
                             </div>
                         `;
                     }).join('')}
                 </div>
             </div>
         `;
+
+        this.shadowRoot.getElementById('title-display').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.isJumping = !this.isJumping;
+            this.render();
+        });
+
+        if (this.isJumping) {
+            this.shadowRoot.querySelectorAll('.year-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const newYear = parseInt(item.dataset.year);
+                    const newDate = new Date(newYear, month, 1);
+                    store.setState({ currentDate: newDate, selectedDate: null });
+                    // Keep overlay open to pick month if needed, or close? Usually good to stay open until month pick.
+                });
+            });
+
+            this.shadowRoot.querySelectorAll('.picker-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const newMonth = parseInt(item.dataset.month);
+                    const newDate = new Date(year, newMonth, 1);
+                    store.setState({ currentDate: newDate, selectedDate: null });
+                    this.isJumping = false;
+                });
+            });
+
+            // Close when clicking outside the title/overlay area
+            document.addEventListener('click', (e) => {
+                if (this.isJumping && !this.shadowRoot.contains(e.target)) {
+                    this.isJumping = false;
+                    this.render();
+                }
+            }, { once: true });
+        }
+
         this.shadowRoot.querySelectorAll('.day-cell').forEach(cell => cell.addEventListener('click', () => store.selectDate(cell.dataset.date)));
         this.shadowRoot.getElementById('prev-btn').addEventListener('click', () => store.prevMonth());
         this.shadowRoot.getElementById('next-btn').addEventListener('click', () => store.nextMonth());
@@ -955,16 +1308,29 @@ class DailyView extends BaseComponent {
             return;
         }
         const dateStr = store.state.selectedDate;
-        if(!store.state.comments[dateStr]) store.loadComments(dateStr);
+        const targetUid = store.state.viewingUser ? store.state.viewingUser.uid : store.state.user.uid;
+        const commentKey = `${targetUid}_${dateStr}`;
+        
+        if(!store.state.comments[commentKey]) store.loadComments(dateStr);
 
         const tasks = store.state.tasks[dateStr] || [];
-        const comments = store.state.comments[dateStr] || [];
+        const comments = store.state.comments[commentKey] || [];
+
+        const { viewingUser, lang } = store.state;
+        let taskTitle = 'Tasks';
+        if (viewingUser) {
+            if (lang === 'ko') {
+                taskTitle = `${viewingUser.nickname}의 일정`;
+            } else {
+                taskTitle = `${viewingUser.nickname}'s Tasks`;
+            }
+        }
 
         this.shadowRoot.innerHTML = `
             <style>
                 @import url('/style.css');
                 :host { display: block; }
-                .daily-panel { background: var(--surface-color); border-radius: 12px; padding: 20px; min-height: 400px; display: flex; flex-direction: column; }
+                .daily-panel { background: var(--surface-color); border-radius: 12px; padding: 20px; min-height: 200px; display: block; }
                 .task-item, .comment-item { border-bottom: 1px solid var(--border-color); padding: 10px 0; }
                 .completed { text-decoration: line-through; opacity: 0.5; }
                 .section-title { font-size: 1.1rem; font-weight: bold; margin: 20px 0 10px; color: var(--primary-color); }
@@ -991,7 +1357,7 @@ class DailyView extends BaseComponent {
             
             <div class="daily-panel">
                 <h2 style="margin-bottom:10px;">${dateStr}</h2>
-                <div class="section-title">Tasks</div>
+                <div class="section-title">${taskTitle}</div>
                 <div id="task-list">
                     ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${store.t.noTasks}</p>` : ''}
                     ${tasks.map((t, index) => `
@@ -1008,23 +1374,100 @@ class DailyView extends BaseComponent {
                     <div class="friend-suggestions" id="suggestions"></div>
                 </div>
 
-                <div class="section-title">${store.t.commentsTitle}</div>
-                <div id="comment-list" style="flex-grow:1; overflow-y:auto; max-height: 200px;">
-                    ${comments.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${store.t.noComments}</p>` : ''}
-                    ${comments.map(c => `
-                        <div class="comment-item">
-                            <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover)">${c.author}</div>
-                            <div>${c.text}</div>
+                <div class="section-title" style="margin-top: 20px;">${store.t.commentsTitle}</div>
+                <div id="comment-list" style="overflow-y:auto; max-height: 200px;">
+                    ${comments.length === 0 ? `<p style="opacity:0.5; font-size:0.85rem; text-align: center; margin: 15px 0;">${store.t.noComments}</p>` : ''}
+                    ${comments.map(c => {
+                        const isAuthor = store.state.user && c.fromUserId === store.state.user.uid;
+                        return `
+                        <div class="comment-item" style="display:flex; gap:10px; align-items:flex-start; margin-bottom: 10px;">
+                            <img src="${c.authorPhoto || '/assets/logo.svg'}" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
+                            <div style="flex-grow:1;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${c.fromUserId}">${c.author}</div>
+                                    ${isAuthor ? `
+                                        <div style="display:flex; gap:8px;">
+                                            <button class="edit-comment-btn" data-id="${c.id}" data-text="${c.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.7rem; cursor:pointer; padding:0;">Edit</button>
+                                            <button class="delete-comment-btn" data-id="${c.id}" style="background:none; border:none; color:#ff5252; font-size:0.7rem; cursor:pointer; padding:0;">Delete</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="comment-text" style="font-size:0.9rem;">${c.text}</div>
+                            </div>
                         </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
-                <div class="input-group">
+                <div class="input-group" style="margin-top: 5px;">
                     <input type="text" id="comment-input" placeholder="${store.t.addComment}" style="flex-grow:1">
-                    <button class="btn-primary" id="add-comment-btn">Send</button>
+                    <button class="btn-primary" id="add-comment-btn">${store.t.send}</button>
                 </div>
             </div>
         `;
         
+        this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
+            el.addEventListener('click', () => {
+                const uid = el.dataset.uid;
+                if(uid) store.visitUserByUid(uid);
+            });
+        });
+
+        this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const commentItem = btn.closest('.comment-item');
+                const textDiv = commentItem.querySelector('.comment-text');
+                const oldText = textDiv.textContent;
+
+                // Toggle inline edit mode
+                textDiv.innerHTML = `
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+                        <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+                        <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+                    </div>
+                `;
+
+                const editInput = textDiv.querySelector('.edit-input');
+                editInput.focus();
+
+                textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
+                    const newText = editInput.value.trim();
+                    if (newText && newText !== oldText) {
+                        store.updateComment(id, newText);
+                    } else {
+                        textDiv.textContent = oldText; // Restore if no change
+                    }
+                });
+
+                textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+                    textDiv.textContent = oldText;
+                });
+
+                editInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const newText = editInput.value.trim();
+                        if (newText && newText !== oldText) {
+                            store.updateComment(id, newText);
+                        } else {
+                            textDiv.textContent = oldText;
+                        }
+                    }
+                });
+            });
+        });
+
+        this.shadowRoot.querySelectorAll('.delete-comment-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                store.deleteComment(id);
+            });
+        });
+
+        const addComment = () => { const input = this.shadowRoot.getElementById('comment-input'); if (input.value.trim()) { store.addComment(dateStr, input.value.trim()); input.value = ''; } };
+        this.shadowRoot.getElementById('add-comment-btn').addEventListener('click', addComment);
+        this.shadowRoot.getElementById('comment-input').addEventListener('keypress', (e) => { if(e.key==='Enter') addComment(); });
+
         this.shadowRoot.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', (e) => store.toggleTask(dateStr, e.target.dataset.id)));
                 this.shadowRoot.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => store.deleteTask(dateStr, e.target.dataset.id)));
                 
