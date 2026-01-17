@@ -1267,29 +1267,32 @@ class CalendarView extends BaseComponent {
                     text-decoration: line-through;
                 }
                 
-                /* Multi-day task styling - Precision Connection */
                 .task-preview.multi-day { 
                     background: var(--bar-bg); 
                     color: var(--bar-color); 
                     border-radius: 0; 
-                    width: calc(100% + 26px); 
+                    /* Bridge own padding(8) + gap(8) + next padding(8) + 1px overlap = 25px */
+                    width: calc(100% + 25px); 
                     margin-left: -8px; 
-                    margin-right: -18px; 
+                    margin-right: -17px; 
                     padding-left: 8px;
                     font-weight: 600;
                     z-index: 2;
                     box-shadow: 4px 0 0 var(--bar-bg), -4px 0 0 var(--bar-bg);
                     opacity: 1 !important;
                 }
-                .task-preview.multi-day.completed { color: var(--accent-color); }
-                .task-preview.multi-day.completed span { text-decoration: line-through; }
+                .task-preview.multi-day.completed { color: var(--accent-color); } 
+                .task-preview.multi-day.completed span { text-decoration: line-through; } 
                 
                 .task-preview.multi-day.start { 
                     border-top-left-radius: 11px; 
                     border-bottom-left-radius: 11px; 
                     margin-left: 0; 
-                    width: calc(100% + 18px);
+                    width: calc(100% + 17px);
                     box-shadow: 4px 0 0 var(--bar-bg);
+                    overflow: visible; /* Let text flow! */
+                    text-overflow: clip;
+                    z-index: 3;
                 }
                 .task-preview.multi-day.end { 
                     border-top-right-radius: 11px; 
@@ -1372,21 +1375,28 @@ class CalendarView extends BaseComponent {
                         const dayTasks = tasks[dateStr] || [];
                         const dayOfWeek = new Date(year, month, d).getDay();
                         return `
-                            <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}">
+                            <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}" style="z-index: ${50 - d};">
                                 <div class="day-number">${d}</div>
                                 ${dayTasks.slice(0, 3).map(t => {
                                     const isMulti = t.duration && t.duration > 1;
                                     let multiClass = '';
                                     let taskText = t.text;
+                                    
                                     if (isMulti) {
                                         multiClass = 'multi-day';
                                         if (t.dayIndex === 0) multiClass += ' start';
                                         else if (t.dayIndex === t.duration - 1) multiClass += ' end';
-                                        if (dayOfWeek === 6 && !multiClass.includes('end')) multiClass += ' no-bleed';
+                                        
+                                        if (dayOfWeek === 6 && !multiClass.includes('end')) {
+                                            multiClass += ' no-bleed';
+                                        }
+
                                         if (t.dayIndex > 0) taskText = '';
                                     }
+
                                     const checkmark = t.completed ? '✔ ' : '';
                                     const content = taskText ? `<span>${checkmark}${taskText}</span>` : (isMulti ? '&nbsp;' : `<span>${checkmark}</span>`);
+
                                     return `<div class="task-preview ${t.completed ? 'completed' : ''} ${multiClass}">${content}</div>`;
                                 }).join('')}
                                 ${dayTasks.length > 3 ? `<div class="task-preview" style="color:var(--primary-color); background:none; padding:0; height:auto;">+${dayTasks.length - 3}</div>` : ''}
