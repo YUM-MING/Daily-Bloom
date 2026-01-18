@@ -2933,31 +2933,23 @@ class DailyView extends BaseComponent {
 
 
 
-                            <div style="display:flex; gap:5px; margin-top:5px; align-items:center;">
+                            <div style="display:flex; gap:5px; margin-top:5px; align-items:center; flex-wrap: wrap;">
 
 
 
-                                <input type="text" class="edit-task-input" value="${originalText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+                                <input type="text" class="edit-task-input" value="${originalText}" style="flex: 1; min-width: 150px; font-size:0.9rem; padding:4px 8px;">
 
 
 
-                                <button class="edit-lock-btn" style="border:1px solid ${isLocked ? 'var(--primary-color)' : 'var(--border-color)'}; border-radius:8px; width:30px; height:30px; opacity:${isLocked ? '1' : '0.5'}; padding:4px; background:${isLocked ? 'var(--surface-color)' : 'transparent'}; cursor:pointer;">
+                                <div style="display:flex; gap:5px; align-items:center;">
+                                    <button class="edit-lock-btn" style="border:1px solid ${isLocked ? 'var(--primary-color)' : 'var(--border-color)'}; border-radius:8px; width:30px; height:30px; opacity:${isLocked ? '1' : '0.5'}; padding:4px; background:${isLocked ? 'var(--surface-color)' : 'transparent'}; cursor:pointer; flex-shrink:0;">
+                                        <img src="/assets/lock.svg" style="width:100%; height:100%;">
+                                    </button>
 
+                                    <button class="save-task-btn btn-primary" style="font-size:0.7rem; padding:4px 8px; flex-shrink:0;">Save</button>
 
-
-                                    <img src="/assets/lock.svg" style="width:100%; height:100%;">
-
-
-
-                                </button>
-
-
-
-                                <button class="save-task-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
-
-
-
-                                <button class="cancel-task-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+                                    <button class="cancel-task-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color); flex-shrink:0;">Cancel</button>
+                                </div>
 
 
 
