@@ -417,10 +417,24 @@ class Store extends EventTarget {
               const merged = JSON.parse(JSON.stringify(myTasks)); 
               for (const date in taggedTasks) {
                   if (!merged[date]) merged[date] = [];
+                  
+                  // Set of sharedIds already in the merged list (my tasks)
+                  const existingSharedIds = new Set(
+                      merged[date]
+                          .filter(t => t.sharedId)
+                          .map(t => t.sharedId)
+                  );
+
                   taggedTasks[date].forEach(t => {
-                      if (!merged[date].find(mt => mt.id === t.id)) {
-                          merged[date].push(t);
-                      }
+                      // 1. Skip exact duplicates (by ID) - already handled but safety check
+                      if (merged[date].find(mt => mt.id === t.id)) return;
+
+                      // 2. Skip duplicate shared tasks (if I already have a copy with same sharedId)
+                      if (t.sharedId && existingSharedIds.has(t.sharedId)) return;
+
+                      // Add task if unique
+                      merged[date].push(t);
+                      if (t.sharedId) existingSharedIds.add(t.sharedId);
                   });
               }
               updateState(merged);
@@ -463,15 +477,15 @@ class Store extends EventTarget {
 
       onSnapshot(q, (snapshot) => {
           const now = new Date();
-          const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+          const limitDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days retention
           
           let notifications = [];
           snapshot.forEach(doc => {
               const data = doc.data();
-              const createdAt = new Date(data.createdAt);
+              const createdAt = data.createdAt ? new Date(data.createdAt) : new Date(); // Fallback to now
               
-              // Filter: Only keep if created within last 24 hours
-              if (createdAt > oneDayAgo) {
+              // Filter: Only keep if created within last 7 days (relaxed)
+              if (createdAt > limitDate) {
                   notifications.push({ id: doc.id, ...data });
               }
           });
@@ -487,11 +501,20 @@ class Store extends EventTarget {
           // Trigger system notification for new items (skip initial load)
           if (!isFirstLoad && notifications.length > this.state.notifications.length) {
               const newest = notifications[0];
-              if (Notification.permission === 'granted' && document.visibilityState === 'hidden') {
-                  new Notification('Daily Bloom', {
+              if (Notification.permission === 'granted') { // Show even if visible for testing
+                  const noti = new Notification('Daily Bloom', {
                       body: newest.message,
                       icon: '/assets/logo.svg'
                   });
+                  noti.onclick = () => {
+                      window.focus();
+                      if (newest.date) {
+                          // We need to access the store instance or dispatch event. 
+                          // Since we are inside Store class, 'this' refers to Store.
+                          this.selectDate(newest.date);
+                      }
+                      noti.close();
+                  };
               }
           }
           isFirstLoad = false;
@@ -641,33 +664,37 @@ class Store extends EventTarget {
     // Parse multiple tags: @name1 @name2
     const tagRegex = /@(\S+)/g;
     const matches = [...cleanText.matchAll(tagRegex)];
-    const taggedUsers = [];
-    const taggedNames = [];
+    
+    // 1. Identify Friends to Tag
+    const friendsToTag = []; // List of Friend Objects
+    const friendsNames = []; // List of Names for display
+    const taggedUserUids = []; // List of UIDs for 'taggedUsers' field (includes friends)
 
     if (matches.length > 0) {
-        for (const match of matches) {
-            const tagName = match[1];
+        const uniqueNames = new Set(matches.map(m => m[1])); // Deduplicate tag names
+        for (const tagName of uniqueNames) {
             const friend = this.state.blooms.find(b => b.nickname === tagName);
             if (friend) {
                 if (friend.blooms && friend.blooms.includes(this.state.user.uid)) {
-                    taggedUsers.push(friend.uid);
-                    taggedNames.push(tagName);
+                    friendsToTag.push(friend);
+                    friendsNames.push(tagName);
+                    taggedUserUids.push(friend.uid);
                 } else {
                     alert(`@${tagName}님과 태그 불가: 서로 블룸(친구) 상태여야 태그할 수 있습니다!`);
                 }
             }
         }
-        // Remove tags from text for display
+        // Remove tags from text for clean display
         cleanText = cleanText.replace(tagRegex, '').trim();
     }
     
-    // Add myself to taggedUsers for visibility check logic
-    if (taggedUsers.length > 0) {
-        taggedUsers.push(this.state.user.uid);
-    }
-
+    // 2. Prepare 'taggedUsers' field (Access Control List)
+    // Must include ME + ALL Friends
+    const allParticipants = [this.state.user.uid, ...taggedUserUids];
+    
+    // 3. Prepare Common Data
     const groupId = 'group-' + Date.now();
-    const sharedId = 'share-' + Date.now(); // Link shared copies
+    const sharedId = friendsToTag.length > 0 ? 'share-' + Date.now() : null;
     const baseDate = new Date(dateStr);
     const order = Date.now(); 
 
@@ -696,56 +723,57 @@ class Store extends EventTarget {
         tasksToAdd.push({ date: dateStr, text: cleanText });
     }
 
+    // 4. Create Tasks in Database
     for (const taskData of tasksToAdd) {
-        // Determine Visibility
-        let visibility = 'public';
-        if (isPrivate) visibility = 'private';
-        else if (taggedUsers.length > 0) visibility = 'protected';
-
-        // Base task object
+        // Base task object for everyone
         const baseTask = {
             date: taskData.date,
-            userId: this.state.user.uid,
             completed: false,
             createdAt: new Date().toISOString(),
             groupId,
-            sharedId: taggedUsers.length > 0 ? sharedId : null,
+            sharedId,
             order,
             duration: taskData.duration || 1,
             dayIndex: taskData.dayIndex ?? -1,
-            isPrivate, // Keep for backward compatibility/UI logic
-            visibility, // New Security Field
-            taggedUsers: taggedUsers.length > 0 ? taggedUsers : null
+            isPrivate: false, // Default to false if tagged, overridden below
+            visibility: 'public', // Default public, overridden below
+            taggedUsers: allParticipants.length > 1 ? allParticipants : null
         };
 
         try {
-            // 1. Create MY task
+            // A. Create MY task (Once per date)
+            let myVisibility = isPrivate ? 'private' : (allParticipants.length > 1 ? 'protected' : 'public');
             let myText = taskData.text;
-            if (taggedNames.length > 0) {
-                myText += ` (with ${taggedNames.join(', ')})`;
+            if (friendsNames.length > 0) {
+                myText += ` (with ${friendsNames.join(', ')})`;
             }
-            await addDoc(collection(db, "tasks"), { ...baseTask, text: myText });
             
-            // 2. Create FRIEND tasks
-            for (const fUid of taggedUsers) {
-                if (fUid === this.state.user.uid) continue; // Skip myself
-                
-                // For friend, text shows "with Me, otherFriend"
-                const others = [this.state.user.nickname, ...taggedNames].filter(n => n !== this.state.blooms.find(b=>b.uid === fUid)?.nickname);
-                const friendText = `${taskData.text} (with ${others.join(', ')})`;
+            await addDoc(collection(db, "tasks"), { 
+                ...baseTask, 
+                userId: this.state.user.uid,
+                text: myText,
+                isPrivate: isPrivate,
+                visibility: myVisibility
+            });
+            
+            // B. Create FRIEND tasks (Loop through friends)
+            for (const friend of friendsToTag) {
+                // Text for friend: "Task (with Me, OtherFriend)"
+                // Exclude current friend's name from list
+                const othersNames = [this.state.user.nickname, ...friendsNames.filter(n => n !== friend.nickname)];
+                const friendText = `${taskData.text} (with ${othersNames.join(', ')})`;
 
                 await addDoc(collection(db, "tasks"), {
                     ...baseTask,
-                    userId: fUid,
+                    userId: friend.uid,
                     text: friendText,
                     isPrivate: false, 
-                    visibility: 'protected', // Shared copies are protected
-                    taggedUsers: taggedUsers // Ensure they see me as tagged (contains everyone)
+                    visibility: 'protected' // Shared copies are always protected/visible to participants
                 });
                 
-                // Notification (only on first day)
+                // Notification (only on first day of the sequence to avoid spam)
                 if (taskData.date === dateStr) {
-                    await this.sendNotification(fUid, 'tag', `${this.state.user.nickname}님이 일정에 태그했습니다: ${taskData.text}`, null, dateStr);
+                    await this.sendNotification(friend.uid, 'tag', `${this.state.user.nickname}님이 일정에 태그했습니다: ${taskData.text}`, null, dateStr);
                 }
             }
         } catch (e) {
@@ -753,7 +781,7 @@ class Store extends EventTarget {
         }
     }
 
-    if (taggedNames.length > 0) alert(`${taggedNames.join(', ')}님과 일정을 공유했습니다!`);
+    if (friendsNames.length > 0) alert(`${friendsNames.join(', ')}님과 일정을 공유했습니다!`);
   }
 
   async reorderTasks(dateStr, reorderedTasks) {
@@ -780,13 +808,24 @@ class Store extends EventTarget {
   }
 
   async updateTask(taskId, newText, isPrivate) {
-      if(this.state.viewingUser) return;
+      // Check permissions: Owner OR Tagged
+      // Note: We need to fetch the task to check 'taggedUsers' if viewingUser is true.
+      // But here we fetch it anyway.
       
       const taskRef = doc(db, "tasks", taskId);
       const taskSnap = await getDoc(taskRef);
       if(!taskSnap.exists()) return;
       
       const taskData = taskSnap.data();
+      
+      // Permission Check
+      const isOwner = taskData.userId === this.state.user.uid;
+      const isTagged = taskData.taggedUsers && taskData.taggedUsers.includes(this.state.user.uid);
+      
+      if (!isOwner && !isTagged) {
+          alert("수정 권한이 없습니다.");
+          return;
+      }
       
       // Prepare updates
       const updates = {};
@@ -840,9 +879,7 @@ class Store extends EventTarget {
   }
 
   async deleteTask(dateStr, taskId) {
-      if(this.state.viewingUser) return;
-      
-      // Check ownership
+      // Check ownership or tagged permission
       let task = this.state.tasks[dateStr]?.find(t => t.id === taskId);
       if (!task) {
            // Fallback fetch if not in state
@@ -850,7 +887,15 @@ class Store extends EventTarget {
            if(snap.exists()) task = { id: snap.id, ...snap.data() };
       }
 
-      if (task && task.userId !== this.state.user.uid) return;
+      if (!task) return;
+
+      const isOwner = task.userId === this.state.user.uid;
+      const isTagged = task.taggedUsers && task.taggedUsers.includes(this.state.user.uid);
+
+      if (!isOwner && !isTagged) {
+          alert("삭제 권한이 없습니다.");
+          return;
+      }
 
       if(!confirm("이 일정을 삭제할까요? (연결된 일정이 있다면 모두 삭제됩니다)")) return;
 
@@ -1114,12 +1159,14 @@ class HelpModal extends BaseComponent {
                         </div>
                     </div>
                     
-                    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888; display:flex; align-items:center; justify-content:center; gap:5px; flex-wrap:wrap;">
-                        다시 보고 싶으면 우측 상단의 
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC1CC" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle; display:inline-block;">
-                            <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"/>
-                        </svg>
-                        <strong>하트 버튼</strong>을 눌러주세요!
+                    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888; display:flex; flex-direction:column; align-items:center; gap:5px;">
+                        <span>다시 보고 싶으면 우측 상단의</span>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC1CC" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;">
+                                <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"/>
+                            </svg>
+                            <strong>하트 버튼</strong>을 눌러주세요!
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2309,11 +2356,11 @@ class DailyView extends BaseComponent {
 
                                 }
 
-                                .mobile-close { display: block; }
+                                .mobile-close { display: block; top: 15px; right: 15px; }
 
                                 /* Offset help button when close button is visible */
 
-                                #help-trigger { right: 60px; top: 18px; }
+                                #help-trigger { right: 55px; top: 18px; }
 
                             }
 
@@ -2385,6 +2432,9 @@ class DailyView extends BaseComponent {
                                     ${tasks.map((t, index) => {
 
                         const isMulti = t.duration && t.duration > 1;
+                        
+                        // Check permission: Owner OR Tagged
+                        const canEdit = !viewingUser || (t.taggedUsers && t.taggedUsers.includes(store.state.user.uid));
 
                         return `
 
@@ -2404,7 +2454,7 @@ class DailyView extends BaseComponent {
 
                                                                                                                                                                     </div>
 
-                            ${!viewingUser ? `
+                            ${canEdit ? `
 
                                 <div style="display:flex; gap:8px; margin-left: 28px;">
 
