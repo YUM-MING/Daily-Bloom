@@ -2726,589 +2726,305 @@ class DailyView extends BaseComponent {
 
                                                 </div>
 
-                                                <!-- Render Child Replies -->
+                                                                                                <!-- Render Child Replies -->
 
-                                                ${childReplies.map(r => {
+                                                                                                ${childReplies.map(r => {
 
-                                                    const isReplyAuthor = store.state.user && r.fromUserId === store.state.user.uid;
+                                                                                                    const isReplyAuthor = store.state.user && r.fromUserId === store.state.user.uid;
 
-                                                    return `
+                                                                                                    return `
 
-                                                    <div class="comment-item reply" style="display:flex; gap:10px; align-items:flex-start; margin-left: 40px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+                                                                                                    <div class="comment-item reply" style="display:flex; gap:10px; align-items:flex-start; margin-left: 40px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
 
-                                                        <div style="font-size: 0.8rem; opacity: 0.4;">↳</div>
+                                                                                                        <div style="font-size: 0.8rem; opacity: 0.4;">↳</div>
 
-                                                        <img src="${r.authorPhoto || '/assets/logo.svg'}" alt="${r.author}'s profile" style="width:24px; height:24px; border-radius:50%; object-fit:cover; margin-top:2px; cursor:pointer;" class="commenter-avatar" data-uid="${r.fromUserId}">
+                                                                                                        <img src="${r.authorPhoto || '/assets/logo.svg'}" alt="${r.author}'s profile" style="width:24px; height:24px; border-radius:50%; object-fit:cover; margin-top:2px; cursor:pointer;" class="commenter-avatar" data-uid="${r.fromUserId}">
 
-                                                        <div style="flex-grow:1;">
+                                                                                                        <div style="flex-grow:1;">
 
-                                                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                                                                            <div style="display:flex; justify-content:space-between; align-items:center;">
 
-                                                                <div style="font-weight:bold; font-size:0.75rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${r.fromUserId}">${r.author}</div>
+                                                                                                                <div style="font-weight:bold; font-size:0.75rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${r.fromUserId}">${r.author}</div>
 
-                                                                ${isReplyAuthor ? `
+                                                                                                                <div style="display:flex; gap:8px;">
 
-                                                                    <div style="display:flex; gap:8px;">
+                                                                                                                    <button class="reply-comment-btn" data-id="${c.id}" data-reply-to="${r.author}" style="background:none; border:none; color:var(--primary-color); font-size:0.65rem; cursor:pointer; padding:0;">Reply</button>
 
-                                                                        <button class="edit-comment-btn" data-id="${r.id}" data-text="${r.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.65rem; cursor:pointer; padding:0;">Edit</button>
+                                                                                                                    ${isReplyAuthor ? `
 
-                                                                        <button class="delete-comment-btn" data-id="${r.id}" style="background:none; border:none; color:#ff5252; font-size:0.65rem; cursor:pointer; padding:0;">Delete</button>
+                                                                                                                        <button class="edit-comment-btn" data-id="${r.id}" data-text="${r.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.65rem; cursor:pointer; padding:0;">Edit</button>
 
-                                                                    </div>
+                                                                                                                        <button class="delete-comment-btn" data-id="${r.id}" style="background:none; border:none; color:#ff5252; font-size:0.65rem; cursor:pointer; padding:0;">Delete</button>
 
-                                                                ` : ''}
+                                                                                                                    ` : ''}
+
+                                                                                                                </div>
+
+                                                                                                            </div>
+
+                                                                                                            <div class="comment-text" style="font-size:0.85rem;">${r.text}</div>
+
+                                                                                                        </div>
+
+                                                                                                    </div>
+
+                                                                                                    `;
+
+                                                                                                }).join('')}
+
+                                                                                            </div>
+
+                                                                                            `;
+
+                                                                                        }).join('');
+
+                                                                                    })()}
+
+                                                                                </div>
+
+                                                                <div class="input-group" style="margin-top: 5px;">
+
+                                                                    <input type="text" id="comment-input" placeholder="${store.t.addComment}" style="flex-grow:1">
+
+                                                                    <button class="btn-primary" id="add-comment-btn">${store.t.send}</button>
+
+                                                                </div>
 
                                                             </div>
 
-                                                            <div class="comment-text" style="font-size:0.85rem;">${r.text}</div>
+                                                        `;
 
-                                                        </div>
+                                                        
 
-                                                    </div>
+                                                                const closeBtn = this.shadowRoot.getElementById('close-view');
 
-                                                    `;
+                                                        
 
-                                                }).join('')}
+                                                                if(closeBtn) closeBtn.addEventListener('click', () => store.setState({ selectedDate: null }));
 
-                                            </div>
+                                                        
 
-                                            `;
+                                                        
 
-                                        }).join('');
+                                                        
 
-                                    })()}
+                                                                const helpBtn = this.shadowRoot.getElementById('help-trigger');
 
-                                </div>
+                                                        
 
-                <div class="input-group" style="margin-top: 5px;">
+                                                                if(helpBtn) {
 
-                    <input type="text" id="comment-input" placeholder="${store.t.addComment}" style="flex-grow:1">
+                                                        
 
-                    <button class="btn-primary" id="add-comment-btn">${store.t.send}</button>
+                                                                    helpBtn.addEventListener('click', () => {
 
-                </div>
+                                                        
 
-            </div>
+                                                                        const helpModal = document.createElement('help-modal');
 
-        `;
+                                                        
 
-        
+                                                                        document.body.appendChild(helpModal);
 
-                const closeBtn = this.shadowRoot.getElementById('close-view');
+                                                        
 
-        
+                                                                    });
 
-                if(closeBtn) closeBtn.addEventListener('click', () => store.setState({ selectedDate: null }));
+                                                        
 
-        
+                                                                }
 
-        
+                                                        
 
-        
+                                                        
 
-                const helpBtn = this.shadowRoot.getElementById('help-trigger');
+                                                        
 
-        
+                                                                this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
 
-                if(helpBtn) {
+                                                            el.addEventListener('click', () => {
 
-        
+                                                                const uid = el.dataset.uid;
 
-                    helpBtn.addEventListener('click', () => {
+                                                                if(uid) store.visitUserByUid(uid);
 
-        
+                                                            });
 
-                        const helpModal = document.createElement('help-modal');
+                                                        });
 
-        
+                                                
 
-                        document.body.appendChild(helpModal);
+                                                                        this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
 
-        
+                                                                            btn.addEventListener('click', () => {
 
-                    });
+                                                                                const id = btn.dataset.id;
 
-        
+                                                                                const commentItem = btn.closest('.comment-item');
 
-                }
+                                                                                const textDiv = commentItem.querySelector('.comment-text');
 
-        
+                                                                                const oldText = textDiv.textContent;
 
-        
+                                                                
 
-        
+                                                                                // Toggle inline edit mode
 
-                this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
+                                                                                textDiv.innerHTML = `
 
-            el.addEventListener('click', () => {
+                                                                                    <div style="display:flex; gap:5px; margin-top:5px;">
 
-                const uid = el.dataset.uid;
+                                                                                        <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
 
-                if(uid) store.visitUserByUid(uid);
+                                                                                        <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
 
-            });
+                                                                                        <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
 
-        });
+                                                                                    </div>
 
+                                                                                `;
 
+                                                                
 
-                        this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
+                                                                                const editInput = textDiv.querySelector('.edit-input');
 
+                                                                                editInput.focus();
 
+                                                                
 
-                            btn.addEventListener('click', () => {
+                                                                                textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
 
+                                                                                    const newText = editInput.value.trim();
 
+                                                                                    if (newText && newText !== oldText) {
 
-                                const id = btn.dataset.id;
+                                                                                        store.updateComment(id, newText);
 
+                                                                                    } else {
 
+                                                                                        textDiv.textContent = oldText; // Restore if no change
 
-                                const commentItem = btn.closest('.comment-item');
+                                                                                    }
 
+                                                                                });
 
+                                                                
 
-                                const textDiv = commentItem.querySelector('.comment-text');
+                                                                                textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
 
+                                                                                    textDiv.textContent = oldText;
 
+                                                                                });
 
-                                const oldText = textDiv.textContent;
+                                                                
 
+                                                                                editInput.addEventListener('keypress', (e) => {
 
+                                                                                    if (e.key === 'Enter') {
 
-                
+                                                                                        const newText = editInput.value.trim();
 
+                                                                                        if (newText && newText !== oldText) {
 
+                                                                                            store.updateComment(id, newText);
 
-                                // Toggle inline edit mode
+                                                                                        } else {
 
+                                                                                            textDiv.textContent = oldText;
 
+                                                                                        }
 
-                                textDiv.innerHTML = `
+                                                                                    }
 
+                                                                                });
 
+                                                                            });
 
-                                    <div style="display:flex; gap:5px; margin-top:5px;">
+                                                                        });
 
+                                                                
 
+                                                                        // Reply Logic
 
-                                        <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+                                                                        this.shadowRoot.querySelectorAll('.reply-comment-btn').forEach(btn => {
 
+                                                                            btn.addEventListener('click', () => {
 
+                                                                                const id = btn.dataset.id;
 
-                                        <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+                                                                                const replyTo = btn.dataset.replyTo;
 
+                                                                                const container = this.shadowRoot.getElementById(`reply-to-${id}`);
 
+                                                                                
 
-                                        <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+                                                                                if (!container.classList.contains('hidden')) {
 
+                                                                                    container.classList.add('hidden');
 
+                                                                                    return;
 
-                                    </div>
+                                                                                }
 
+                                                                
 
+                                                                                container.innerHTML = `
 
-                                `;
+                                                                                    <div style="display:flex; flex-direction:column; gap:5px; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px;">
 
+                                                                                        <div style="font-size:0.7rem; opacity:0.6; margin-left:5px;">Replying to ${replyTo ? replyTo : 'comment'}...</div>
 
+                                                                                        <div style="display:flex; gap:5px;">
 
-                
+                                                                                            <input type="text" class="reply-input" placeholder="답글을 남겨보세요..." style="flex-grow:1; font-size:0.8rem; padding:6px 10px;">
 
+                                                                                            <button class="send-reply-btn btn-primary" style="font-size:0.7rem; padding:6px 12px;">Send</button>
 
+                                                                                        </div>
 
-                                const editInput = textDiv.querySelector('.edit-input');
+                                                                                    </div>
 
+                                                                                `;
 
+                                                                                container.classList.remove('hidden');
 
-                                editInput.focus();
+                                                                                
 
+                                                                                const input = container.querySelector('.reply-input');
 
+                                                                                input.focus();
 
-                
+                                                                
 
+                                                                                const sendReply = async () => {
 
+                                                                                    const val = input.value.trim();
 
-                                textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
+                                                                                    if (val) {
 
+                                                                                        // If replying to a person, we can prefix with @Name but the logic already notifies everyone in thread.
 
+                                                                                        await store.addComment(dateStr, val, id);
 
-                                    const newText = editInput.value.trim();
+                                                                                        container.classList.add('hidden');
 
+                                                                                    }
 
+                                                                                };
 
-                                    if (newText && newText !== oldText) {
+                                                                
 
+                                                                                container.querySelector('.send-reply-btn').addEventListener('click', sendReply);
 
+                                                                                input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendReply(); });
 
-                                        store.updateComment(id, newText);
+                                                                            });
 
+                                                                        });
 
+                                                
 
-                                    } else {
-
-
-
-                                        textDiv.textContent = oldText; // Restore if no change
-
-
-
-                                    }
-
-
-
-                                });
-
-
-
-                
-
-
-
-                                textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
-
-
-
-                                    textDiv.textContent = oldText;
-
-
-
-                                });
-
-
-
-                
-
-
-
-                                editInput.addEventListener('keypress', (e) => {
-
-
-
-                                    if (e.key === 'Enter') {
-
-
-
-                                        const newText = editInput.value.trim();
-
-
-
-                                        if (newText && newText !== oldText) {
-
-
-
-                                            store.updateComment(id, newText);
-
-
-
-                                        } else {
-
-
-
-                                            textDiv.textContent = oldText;
-
-
-
-                                        }
-
-
-
-                                    }
-
-
-
-                                });
-
-
-
-                            });
-
-
-
-                        });
-
-
-
-                
-
-
-
-                        // Reply Logic
-
-
-
-                        this.shadowRoot.querySelectorAll('.reply-comment-btn').forEach(btn => {
-
-
-
-                            btn.addEventListener('click', () => {
-
-
-
-                                const id = btn.dataset.id;
-
-
-
-                                const container = this.shadowRoot.getElementById(`reply-to-${id}`);
-
-
-
-                                
-
-
-
-                                if (!container.classList.contains('hidden')) {
-
-
-
-                                    container.classList.add('hidden');
-
-
-
-                                    return;
-
-
-
-                                }
-
-
-
-                
-
-
-
-                                container.innerHTML = `
-
-
-
-                                    <div style="display:flex; gap:5px;">
-
-
-
-                                        <input type="text" class="reply-input" placeholder="답글을 남겨보세요..." style="flex-grow:1; font-size:0.8rem; padding:6px 10px;">
-
-
-
-                                        <button class="send-reply-btn btn-primary" style="font-size:0.7rem; padding:6px 12px;">Send</button>
-
-
-
-                                    </div>
-
-
-
-                                `;
-
-
-
-                                container.classList.remove('hidden');
-
-
-
-                                
-
-
-
-                                const input = container.querySelector('.reply-input');
-
-
-
-                                input.focus();
-
-
-
-                
-
-
-
-                                const sendReply = async () => {
-
-
-
-                                    const val = input.value.trim();
-
-
-
-                                    if (val) {
-
-
-
-                                        await store.addComment(dateStr, val, id);
-
-
-
-                                        container.classList.add('hidden');
-
-
-
-                                    }
-
-
-
-                                };
-
-
-
-                
-
-
-
-                                container.querySelector('.send-reply-btn').addEventListener('click', sendReply);
-
-
-
-                                input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendReply(); });
-
-
-
-                            });
-
-
-
-                        });
-
-
-
-        
-
-
-
-                // Reply Logic
-
-
-
-                this.shadowRoot.querySelectorAll('.reply-comment-btn').forEach(btn => {
-
-
-
-                    btn.addEventListener('click', () => {
-
-
-
-                        const id = btn.dataset.id;
-
-
-
-                        const container = this.shadowRoot.getElementById(`reply-to-${id}`);
-
-
-
-                        
-
-
-
-                        if (!container.classList.contains('hidden')) {
-
-
-
-                            container.classList.add('hidden');
-
-
-
-                            return;
-
-
-
-                        }
-
-
-
-        
-
-
-
-                        container.innerHTML = `
-
-
-
-                            <div style="display:flex; gap:5px;">
-
-
-
-                                <input type="text" class="reply-input" placeholder="답글을 남겨보세요..." style="flex-grow:1; font-size:0.8rem; padding:6px 10px;">
-
-
-
-                                <button class="send-reply-btn btn-primary" style="font-size:0.7rem; padding:6px 12px;">Send</button>
-
-
-
-                            </div>
-
-
-
-                        `;
-
-
-
-                        container.classList.remove('hidden');
-
-
-
-                        
-
-
-
-                        const input = container.querySelector('.reply-input');
-
-
-
-                        input.focus();
-
-
-
-        
-
-
-
-                        const sendReply = async () => {
-
-
-
-                            const val = input.value.trim();
-
-
-
-                            if (val) {
-
-
-
-                                await store.addComment(dateStr, val, id);
-
-
-
-                                container.classList.add('hidden');
-
-
-
-                            }
-
-
-
-                        };
-
-
-
-        
-
-
-
-                        container.querySelector('.send-reply-btn').addEventListener('click', sendReply);
-
-
-
-                        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendReply(); });
-
-
-
-                    });
-
-
-
-                });
-
-
-
-        this.shadowRoot.querySelectorAll('.delete-comment-btn').forEach(btn => {
+                                                        this.shadowRoot.querySelectorAll('.delete-comment-btn').forEach(btn => {
 
             btn.addEventListener('click', () => {
 

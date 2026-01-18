@@ -26,10 +26,14 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
 - [x] **Social (Bloom)**:
   - Friend search by email and mutual "Blooming".
   - Real-time "Bloom" (comment) section with inline edit/delete.
+  - **Nested Replies**: Support for threaded conversations with visual indentation.
+  - **Threaded Notifications**: Automatic alerts for all participants in a comment thread (original commenter + previous repliers).
   - Visiting friends' calendars with distinct UI (color banners, read-only mode).
 - [x] **Goal Tracking**: Monthly goal management with deletion and completion features.
 
 ## Technical Details
+- **Nested Replies:** Implemented using a `parentId` field in the `comments` collection, allowing one level of threading for clear communication.
+- **Threaded Notifications:** When a reply is added, the system queries for the `parentId` owner and all existing replies with the same `parentId` to notify all involved parties (excluding the current actor).
 - **Fuzzy Search:** Implemented a scoring algorithm based on character order and string proximity.
 - **Visual Continuity:** CSS trickery with negative margins and group ordering to ensure multi-day task bars appear seamless across the calendar grid.
 - **Real-time UI:** Leveraged `onSnapshot` from Firestore for zero-refresh updates on tasks, comments, and notifications.
