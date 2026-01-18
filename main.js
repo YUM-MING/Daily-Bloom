@@ -228,11 +228,16 @@ class Store extends EventTarget {
   // --- Firestore Actions ---
 
   async loadTasks() {
+      if (this.unsubTasks) {
+          this.unsubTasks();
+          this.unsubTasks = null;
+      }
+
       const targetUid = this.state.viewingUser ? this.state.viewingUser.uid : (this.state.user ? this.state.user.uid : null);
       if(!targetUid) return;
 
       const q = query(collection(db, "tasks"), where("userId", "==", targetUid));
-      onSnapshot(q, (snapshot) => {
+      this.unsubTasks = onSnapshot(q, (snapshot) => {
           const tasks = {};
           snapshot.forEach(doc => {
               const data = doc.data();
@@ -276,11 +281,16 @@ class Store extends EventTarget {
   }
 
   async loadGoals() {
+      if (this.unsubGoals) {
+          this.unsubGoals();
+          this.unsubGoals = null;
+      }
+
       const targetUid = this.state.viewingUser ? this.state.viewingUser.uid : (this.state.user ? this.state.user.uid : null);
       if(!targetUid) return;
 
       const q = query(collection(db, "goals"), where("userId", "==", targetUid));
-      onSnapshot(q, (snapshot) => {
+      this.unsubGoals = onSnapshot(q, (snapshot) => {
           const goals = {};
           snapshot.forEach(doc => {
               const data = doc.data();
@@ -489,13 +499,55 @@ class Store extends EventTarget {
     if(this.state.viewingUser) return; // Prevent modifying friend's tasks
     const task = this.state.tasks[dateStr].find(t => t.id === taskId);
     if(task) {
+        if (task.userId !== this.state.user.uid) return;
         await updateDoc(doc(db, "tasks", taskId), { completed: !task.completed });
     }
   }
 
+  async updateTask(taskId, newText) {
+      if(this.state.viewingUser) return;
+      
+      const taskRef = doc(db, "tasks", taskId);
+      const taskSnap = await getDoc(taskRef);
+      if(!taskSnap.exists()) return;
+      
+      const taskData = taskSnap.data();
+      
+      if (taskData.groupId) {
+          const q = query(collection(db, "tasks"), where("groupId", "==", taskData.groupId));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach(async (d) => {
+              await updateDoc(doc(db, "tasks", d.id), { text: newText });
+          });
+      } else {
+          await updateDoc(taskRef, { text: newText });
+      }
+  }
+
   async deleteTask(dateStr, taskId) {
       if(this.state.viewingUser) return;
-      await updateDoc(doc(db, "tasks", taskId), { userId: "deleted" }); 
+      
+      // Check ownership
+      let task = this.state.tasks[dateStr]?.find(t => t.id === taskId);
+      if (!task) {
+           // Fallback fetch if not in state
+           const snap = await getDoc(doc(db, "tasks", taskId));
+           if(snap.exists()) task = { id: snap.id, ...snap.data() };
+      }
+
+      if (task && task.userId !== this.state.user.uid) return;
+
+      if(!confirm("이 일정을 삭제할까요? (연결된 일정이 있다면 모두 삭제됩니다)")) return;
+
+      if (task.groupId) {
+          const q = query(collection(db, "tasks"), where("groupId", "==", task.groupId));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach(async (d) => {
+              await deleteDoc(doc(db, "tasks", d.id));
+          });
+      } else {
+          await deleteDoc(doc(db, "tasks", taskId));
+      }
   }
 
   async addGoal(monthStr, text) {
@@ -516,6 +568,10 @@ class Store extends EventTarget {
     if(this.state.viewingUser) return;
     const goal = this.state.goals[monthStr].find(g => g.id === goalId);
     if(goal) {
+        if (goal.userId !== this.state.user.uid) {
+            alert("You can only modify your own goals!");
+            return;
+        }
         await updateDoc(doc(db, "goals", goalId), { completed: !goal.completed });
     }
   }
@@ -557,7 +613,7 @@ class Store extends EventTarget {
     return results.sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
         return new Date(b.date) - new Date(a.date);
-    }).slice(0, 8);
+    });
   }
   
   async visitUserByUid(uid) {
@@ -631,6 +687,19 @@ class Store extends EventTarget {
 
   async deleteGoal(goalId) {
       if(this.state.viewingUser) return;
+      
+      // Find the goal to check ownership
+      let goal = null;
+      for (const m in this.state.goals) {
+          const found = this.state.goals[m].find(g => g.id === goalId);
+          if (found) { goal = found; break; }
+      }
+      
+      if (goal && goal.userId !== this.state.user.uid) {
+          alert("You can only delete your own goals!");
+          return;
+      }
+
       if(!confirm("이 목표를 삭제할까요?")) return;
       await deleteDoc(doc(db, "goals", goalId));
   }
@@ -696,6 +765,16 @@ class MyPage extends BaseComponent {
             .btn-danger { background: #ffebee; color: #c62828; }
             .friend-card { cursor: pointer; transition: transform 0.2s; }
             .friend-card:hover { transform: translateY(-2px); border-color: var(--primary-color); }
+            
+            /* Responsive Input Groups */
+            .input-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+            .input-row input { flex: 1; min-width: 0; } /* min-width 0 allows flex item to shrink below content size */
+            .input-row button { flex-shrink: 0; }
+            
+            @media (max-width: 400px) {
+                .input-row { flex-direction: column; gap: 8px; }
+                .input-row button { width: 100%; }
+            }
             </style>
             <div class="my-page-container">
                 <div class="profile-section">
@@ -712,16 +791,16 @@ class MyPage extends BaseComponent {
                     </div>
                 </div>
                 
-                <div style="display:flex; gap:10px; margin-bottom: 20px;">
-                    <input type="text" id="nick-input" placeholder="${t.setNickname}" value="${user.nickname}" style="flex-grow:1">
+                <div class="input-row">
+                    <input type="text" id="nick-input" placeholder="${t.setNickname}" value="${user.nickname}">
                     <button class="btn-primary" id="save-nick">Save</button>
                 </div>
 
                 <div style="border-top: 1px solid var(--border-color); margin: 20px 0;"></div>
 
                 <h3>${t.addFriend}</h3>
-                <div class="friend-search">
-                    <input type="email" id="friend-email" placeholder="${t.searchFriend}" style="flex-grow:1;">
+                <div class="friend-search input-row" style="margin-bottom: 15px;">
+                    <input type="email" id="friend-email" placeholder="${t.searchFriend}">
                     <button class="btn-primary" id="add-friend-btn">+</button>
                 </div>
 
@@ -879,6 +958,10 @@ class AppHeader extends BaseComponent {
         .search-item:hover { background: var(--bg-color); }
         .search-item-text { font-weight: 600; font-size: 0.9rem; }
         .search-item-date { font-size: 0.75rem; color: var(--primary-color); }
+        
+        .sub-item { padding-left: 30px; border-bottom: 1px solid var(--border-color); background: var(--bg-color); }
+        .sub-item:hover { background: var(--surface-color); border-left: 3px solid var(--primary-color); }
+        .group-header { background: var(--surface-color); display: flex; justify-content: space-between; align-items: center; }
 
         .viewing-indicator {
             flex-grow: 1;
@@ -890,6 +973,23 @@ class AppHeader extends BaseComponent {
             justify-content: center;
             gap: 8px;
             font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        @media (max-width: 600px) {
+            header { flex-wrap: wrap; gap: 5px; }
+            .logo-text { display: none; } /* Ensure logo text is hidden on small screens */
+            .viewing-indicator { 
+                order: 3; 
+                width: 100%; 
+                margin-top: 5px; 
+                background: rgba(255, 193, 204, 0.1); 
+                padding: 4px; 
+                border-radius: 8px;
+            }
+            .search-container { width: 100%; top: 50px; }
         }
 
         .controls { 
@@ -898,6 +998,7 @@ class AppHeader extends BaseComponent {
             align-items: center; 
             height: 40px; 
             flex-shrink: 0;
+            margin-left: auto; /* Push to right */
         }
         .avatar-small { 
             width: 32px; 
@@ -997,14 +1098,28 @@ class AppHeader extends BaseComponent {
     const searchContainer = this.shadowRoot.getElementById('search-container');
     const searchToggleBtn = this.shadowRoot.getElementById('search-toggle-btn');
 
+    const closeSearch = (e) => {
+        // Close if clicking outside search container and not on the toggle button
+        if (searchContainer.classList.contains('active') && 
+            !searchContainer.contains(e.target) && 
+            (!searchToggleBtn || !searchToggleBtn.contains(e.target))) {
+            searchContainer.classList.remove('active');
+            searchResults.classList.remove('active');
+            searchInput.value = '';
+        }
+    };
+
     if (searchToggleBtn) {
-        searchToggleBtn.addEventListener('click', () => {
-            searchContainer.classList.toggle('active');
-            if (searchContainer.classList.contains('active')) {
-                searchInput.focus();
-            } else {
+        searchToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isActive = searchContainer.classList.contains('active');
+            if (isActive) {
+                searchContainer.classList.remove('active');
                 searchResults.classList.remove('active');
                 searchInput.value = '';
+            } else {
+                searchContainer.classList.add('active');
+                searchInput.focus();
             }
         });
     }
@@ -1012,37 +1127,89 @@ class AppHeader extends BaseComponent {
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
-            const results = store.searchTasks(query);
-            if (results.length > 0) {
-                searchResults.innerHTML = results.map(r => `
-                    <div class="search-item" data-date="${r.date}">
-                        <div class="search-item-text">${r.text}</div>
-                        <div class="search-item-date">${r.date}</div>
-                    </div>
-                `).join('');
+            const rawResults = store.searchTasks(query);
+            
+            if (rawResults.length > 0) {
+                // Grouping Logic
+                const grouped = {};
+                rawResults.forEach(task => {
+                    // Use text as key for grouping identical tasks. 
+                    // For multi-day tasks, they usually have same text.
+                    const key = task.text; 
+                    if (!grouped[key]) grouped[key] = [];
+                    grouped[key].push(task);
+                });
+
+                // Convert to array and take top 8 groups or so to avoid overload
+                const groups = Object.keys(grouped).map(key => ({
+                    text: key,
+                    items: grouped[key]
+                })).slice(0, 8);
+
+                searchResults.innerHTML = groups.map((g, idx) => {
+                    const count = g.items.length;
+                    const isSingle = count === 1;
+                    
+                    if (isSingle) {
+                        const item = g.items[0];
+                        return `
+                            <div class="search-item" data-date="${item.date}">
+                                <div class="search-item-text">${item.text}</div>
+                                <div class="search-item-date">${item.date}</div>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="search-group" data-idx="${idx}">
+                                <div class="search-item group-header">
+                                    <div class="search-item-text">${g.text} <span style="color:var(--primary-color); font-size:0.8rem;">(${count})</span></div>
+                                    <div class="search-item-date">▾</div>
+                                </div>
+                                <div class="group-items hidden" id="group-${idx}">
+                                    ${g.items.map(item => `
+                                        <div class="search-item sub-item" data-date="${item.date}">
+                                            <div class="search-item-date" style="width:100%">${item.date}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }).join('');
                 searchResults.classList.add('active');
                 
-                // Add click events for results
-                searchResults.querySelectorAll('.search-item').forEach(item => {
-                    item.addEventListener('click', () => {
+                // Add click events
+                // 1. Single items and Sub items -> Navigate
+                searchResults.querySelectorAll('.search-item:not(.group-header)').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
                         store.selectDate(item.dataset.date);
                         searchResults.classList.remove('active');
                         searchContainer.classList.remove('active');
                         searchInput.value = '';
                     });
                 });
+
+                // 2. Group Headers -> Toggle Expand
+                searchResults.querySelectorAll('.group-header').forEach(header => {
+                    header.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const groupIdx = header.parentElement.dataset.idx;
+                        const itemsDiv = searchResults.querySelector(`#group-${groupIdx}`);
+                        itemsDiv.classList.toggle('hidden');
+                        const arrow = header.querySelector('.search-item-date');
+                        arrow.textContent = itemsDiv.classList.contains('hidden') ? '▾' : '▴';
+                    });
+                });
+
             } else {
                 searchResults.classList.remove('active');
             }
         });
-
-        // Close search on click outside
-        document.addEventListener('click', (e) => {
-            if (!this.shadowRoot.contains(e.target)) {
-                if (searchResults) searchResults.classList.remove('active');
-            }
-        });
     }
+
+    // Add global listener for search closing
+    document.addEventListener('click', closeSearch);
 
     const homeBtn = this.shadowRoot.getElementById('home-btn');
     if(homeBtn) {
@@ -1054,8 +1221,20 @@ class AppHeader extends BaseComponent {
     const notiBtn = this.shadowRoot.getElementById('noti-btn');
     const notiDropdown = this.shadowRoot.getElementById('noti-dropdown');
     
+    const closeNoti = (e) => {
+        if (notiDropdown && notiDropdown.classList.contains('active') && 
+            !notiDropdown.contains(e.target) && 
+            !notiBtn.contains(e.target)) {
+            notiDropdown.classList.remove('active');
+        }
+    };
+
+    // Add global listener for notification closing
+    document.addEventListener('click', closeNoti);
+
     if(notiBtn) {
-        notiBtn.addEventListener('click', () => {
+        notiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             notiDropdown.classList.toggle('active');
         });
         
@@ -1145,7 +1324,10 @@ class GoalList extends BaseComponent {
                     ${currentGoals.length === 0 ? `<p>${t.noGoals}</p>` : ''}
                     ${currentGoals.map(g => `
                         <div class="goal-item">
-                            <input type="checkbox" ${g.completed ? 'checked' : ''} data-id="${g.id}" ${viewingUser ? 'disabled' : ''}>
+                            ${viewingUser ? 
+                                (g.completed ? '<span style="width: 13px; text-align: center; color: var(--primary-color); font-weight: bold;">✔</span>' : '<span style="width: 13px; text-align: center; color: var(--text-color); font-weight: bold;">•</span>') : 
+                                `<input type="checkbox" ${g.completed ? 'checked' : ''} data-id="${g.id}">`
+                            }
                             <span style="flex-grow:1" class="${g.completed ? 'completed' : ''}">${g.text}</span>
                             ${!viewingUser ? `<button class="delete-goal-btn" data-id="${g.id}">×</button>` : ''}
                         </div>
@@ -1429,12 +1611,19 @@ class CalendarView extends BaseComponent {
                     this.isJumping = false;
                 });
             });
-            document.addEventListener('click', (e) => {
-                if (this.isJumping && !this.shadowRoot.contains(e.target)) {
+            
+            // Persistent close listener
+            const closeOverlay = (e) => {
+                const overlay = this.shadowRoot.getElementById('jump-overlay');
+                const titleDisplay = this.shadowRoot.getElementById('title-display');
+                if (this.isJumping && overlay && !overlay.contains(e.target) && !titleDisplay.contains(e.target)) {
                     this.isJumping = false;
                     this.render();
+                    document.removeEventListener('click', closeOverlay);
                 }
-            }, { once: true });
+            };
+            // Delay adding listener to avoid immediate close from the opening click
+            setTimeout(() => document.addEventListener('click', closeOverlay), 0);
         }
 
         this.shadowRoot.querySelectorAll('.day-cell').forEach(cell => cell.addEventListener('click', () => store.selectDate(cell.dataset.date)));
@@ -1445,258 +1634,769 @@ class CalendarView extends BaseComponent {
 customElements.define('calendar-view', CalendarView);
 
 class DailyView extends BaseComponent {
+
     render() {
+
         const { selectedDate, viewingUser, lang } = store.state;
+
         if (!selectedDate) {
+
             this.shadowRoot.innerHTML = `
+
                 <style>@import url('/style.css'); .placeholder { text-align: center; padding: 40px; color: var(--text-color); opacity: 0.6; background: var(--surface-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; height: 100%; } :host { height: 100%; }</style>
+
                 <div class="placeholder"><p>${store.t.selectDatePrompt}</p></div>
+
             `;
+
             return;
+
         }
+
         const dateStr = selectedDate;
+
         const targetUid = viewingUser ? viewingUser.uid : store.state.user.uid;
+
         const commentKey = `${targetUid}_${dateStr}`;
+
         
+
         if(!store.state.comments[commentKey]) store.loadComments(dateStr);
 
+
+
         const tasks = store.state.tasks[dateStr] || [];
+
         const comments = store.state.comments[commentKey] || [];
 
+
+
         let taskTitle = 'Tasks';
+
         if (viewingUser) {
+
             if (lang === 'ko') {
+
                 taskTitle = `${viewingUser.nickname}의 일정`;
+
             } else {
+
                 taskTitle = `${viewingUser.nickname}'s Tasks`;
+
             }
+
         }
+
+
 
         this.shadowRoot.innerHTML = `
+
             <style>
+
                 @import url('/style.css');
+
                 :host { display: block; }
+
                 .daily-panel { background: var(--surface-color); border-radius: 12px; padding: 20px; min-height: 200px; display: block; position: relative; }
+
                 .task-item, .comment-item { border-bottom: 1px solid var(--border-color); padding: 10px 0; }
+
+                .task-item.dragging { opacity: 0.5; background: var(--bg-color); border: 1px dashed var(--primary-color); }
+
                 .completed { text-decoration: line-through; opacity: 0.5; }
-                .section-title { font-size: 1.1rem; font-weight: bold; margin: 20px 0 10px; color: var(--primary-color); }
-                .input-group { display: flex; gap: 5px; margin-top: 10px; position: relative; }
-                
-                .mobile-close { display: none; position: absolute; top: 15px; right: 15px; font-size: 1.5rem; color: var(--text-color); cursor: pointer; z-index: 10; }
+
+                                .section-title { font-size: 1.1rem; font-weight: bold; margin: 20px 0 10px; color: var(--primary-color); }
+
+                                .input-group { display: flex; gap: 8px; margin-top: 10px; position: relative; width: 100%; }
+
+                                .input-group input { flex: 1; min-width: 0; } /* Crucial for preventing overflow */
+
+                                .input-group button { flex-shrink: 0; white-space: nowrap; } /* Prevent button text wrapping/squashing */
+
+                                
+
+                                .mobile-close { display: none; position: absolute; top: 15px; right: 15px; font-size: 1.5rem; color: var(--text-color); cursor: pointer; z-index: 10; }
+
+
 
                 @media (max-width: 1024px) {
+
                     :host {
+
                         position: fixed;
+
                         top: 0;
+
                         left: 0;
+
                         width: 100%;
+
                         height: 100%;
+
                         background: rgba(0,0,0,0.5);
+
                         z-index: 2000;
+
                         display: flex;
+
                         justify-content: center;
+
                         align-items: center;
+
                         padding: 20px;
+
                         box-sizing: border-box;
+
                     }
+
                     .daily-panel {
+
                         width: 100%;
+
                         max-width: 500px;
+
                         max-height: 80vh;
+
                         overflow-y: auto;
+
                         box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+
                     }
+
                     .mobile-close { display: block; }
+
                 }
+
+
 
                 .friend-suggestions {
+
                     position: absolute;
+
                     bottom: 100%;
+
                     left: 0;
+
                     background: var(--surface-color);
+
                     border: 1px solid var(--border-color);
+
                     border-radius: 8px;
+
                     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+
                     width: 200px;
+
                     max-height: 150px;
+
                     overflow-y: auto;
+
                     display: none;
+
                     z-index: 10;
+
                 }
+
                 .friend-suggestions.active { display: block; }
+
                 .suggestion-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+
                 .suggestion-item:hover { background: var(--bg-color); }
+
                 .suggestion-item img { width: 24px; height: 24px; border-radius: 50%; }
+
             </style>
+
             
+
             <div class="daily-panel">
+
                 <span class="mobile-close" id="close-view">&times;</span>
+
                 <h2 style="margin-bottom:10px;">${dateStr}</h2>
+
                 <div class="section-title">${taskTitle}</div>
+
                 <div id="task-list">
+
                     ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${store.t.noTasks}</p>` : ''}
+
                     ${tasks.map((t, index) => {
+
                         const isMulti = t.duration && t.duration > 1;
+
                         return `
-                        <div class="task-item" draggable="${!viewingUser}" data-index="${index}" style="display:flex; align-items:center; gap:12px; cursor:${viewingUser ? 'default' : 'grab'}; padding: 8px 0;">
-                            <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}" ${viewingUser ? 'disabled' : ''}>
-                            <span style="flex-grow:1" class="${t.completed ? 'completed' : ''}">${t.text}${isMulti ? ' (Multiple)' : ''}</span>
-                            ${!viewingUser ? `<button class="delete-btn" data-id="${t.id}" style="color:red; background:none; font-size: 1.2rem; cursor: pointer;">×</button>` : ''}
+
+                                                <div class="task-item" draggable="${!viewingUser}" data-index="${index}" style="display:flex; flex-direction: column; gap: 5px; cursor:${viewingUser ? 'default' : 'grab'}; padding: 8px 0;">
+
+                                                    <div style="display:flex; align-items:center; gap:12px; width: 100%;">
+
+                                                        <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}" ${viewingUser ? 'disabled' : ''}>
+
+                                                        <span style="flex-grow:1" class="task-text ${t.completed ? 'completed' : ''}">${t.text}</span>
+
+                                                    </div>
+
+                            ${!viewingUser ? `
+
+                                <div style="display:flex; gap:8px; margin-left: 28px;">
+
+                                    <button class="edit-task-btn" data-id="${t.id}" data-text="${t.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.7rem; cursor:pointer; padding:0;">Edit</button>
+
+                                    <button class="delete-task-btn" data-id="${t.id}" style="background:none; border:none; color:#ff5252; font-size:0.7rem; cursor:pointer; padding:0;">Delete</button>
+
+                                </div>
+
+                            ` : ''}
+
                         </div>
+
                         `;
+
                     }).join('')}
+
                 </div>
+
                 ${!viewingUser ? `
+
                     <div class="input-group">
+
                         <input type="text" id="task-input" placeholder="${store.t.addTask}" style="flex-grow:1" autocomplete="off">
+
                         <button class="btn-primary" id="add-task-btn">+</button>
+
                         <div class="friend-suggestions" id="suggestions"></div>
+
                     </div>
+
                 ` : ''}
 
+
+
                 <div class="section-title" style="margin-top: 20px;">${store.t.commentsTitle}</div>
+
                 <div id="comment-list" style="overflow-y:auto; max-height: 200px;">
+
                     ${comments.length === 0 ? `<p style="opacity:0.5; font-size:0.85rem; text-align: center; margin: 15px 0;">${store.t.noComments}</p>` : ''}
+
                     ${comments.map(c => {
+
                         const isAuthor = store.state.user && c.fromUserId === store.state.user.uid;
+
                         return `
+
                         <div class="comment-item" style="display:flex; gap:10px; align-items:flex-start; margin-bottom: 10px;">
+
                             <img src="${c.authorPhoto || '/assets/logo.svg'}" alt="${c.author}'s profile" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
+
                             <div style="flex-grow:1;">
+
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
+
                                     <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${c.fromUserId}">${c.author}</div>
+
                                     ${isAuthor ? `
+
                                         <div style="display:flex; gap:8px;">
+
                                             <button class="edit-comment-btn" data-id="${c.id}" data-text="${c.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.7rem; cursor:pointer; padding:0;">Edit</button>
+
                                             <button class="delete-comment-btn" data-id="${c.id}" style="background:none; border:none; color:#ff5252; font-size:0.7rem; cursor:pointer; padding:0;">Delete</button>
+
                                         </div>
+
                                     ` : ''}
+
                                 </div>
+
                                 <div class="comment-text" style="font-size:0.9rem;">${c.text}</div>
+
                             </div>
+
                         </div>
+
                         `;
+
                     }).join('')}
+
                 </div>
+
                 <div class="input-group" style="margin-top: 5px;">
+
                     <input type="text" id="comment-input" placeholder="${store.t.addComment}" style="flex-grow:1">
+
                     <button class="btn-primary" id="add-comment-btn">${store.t.send}</button>
+
                 </div>
+
             </div>
+
         `;
+
         
+
         const closeBtn = this.shadowRoot.getElementById('close-view');
+
         if(closeBtn) closeBtn.addEventListener('click', () => store.setState({ selectedDate: null }));
 
+
+
         this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
+
             el.addEventListener('click', () => {
+
                 const uid = el.dataset.uid;
+
                 if(uid) store.visitUserByUid(uid);
+
             });
+
         });
+
+
 
         this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
+
             btn.addEventListener('click', () => {
+
                 const id = btn.dataset.id;
+
                 const commentItem = btn.closest('.comment-item');
+
                 const textDiv = commentItem.querySelector('.comment-text');
+
                 const oldText = textDiv.textContent;
 
+
+
                 // Toggle inline edit mode
+
                 textDiv.innerHTML = `
+
                     <div style="display:flex; gap:5px; margin-top:5px;">
+
                         <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+
                         <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+
                         <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+
                     </div>
+
                 `;
 
+
+
                 const editInput = textDiv.querySelector('.edit-input');
+
                 editInput.focus();
 
+
+
                 textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
+
                     const newText = editInput.value.trim();
+
                     if (newText && newText !== oldText) {
+
                         store.updateComment(id, newText);
+
                     } else {
+
                         textDiv.textContent = oldText; // Restore if no change
+
                     }
+
                 });
+
+
 
                 textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+
                     textDiv.textContent = oldText;
+
                 });
+
+
 
                 editInput.addEventListener('keypress', (e) => {
+
                     if (e.key === 'Enter') {
+
                         const newText = editInput.value.trim();
+
                         if (newText && newText !== oldText) {
+
                             store.updateComment(id, newText);
+
                         } else {
+
                             textDiv.textContent = oldText;
+
                         }
+
                     }
+
                 });
+
             });
+
         });
+
+
 
         this.shadowRoot.querySelectorAll('.delete-comment-btn').forEach(btn => {
+
             btn.addEventListener('click', () => {
+
                 const id = btn.dataset.id;
+
                 store.deleteComment(id);
+
             });
+
         });
 
+
+
         const addComment = () => { const input = this.shadowRoot.getElementById('comment-input'); if (input.value.trim()) { store.addComment(dateStr, input.value.trim()); input.value = ''; } };
+
         this.shadowRoot.getElementById('add-comment-btn').addEventListener('click', addComment);
+
         this.shadowRoot.getElementById('comment-input').addEventListener('keypress', (e) => { if(e.key==='Enter') addComment(); });
 
+
+
         this.shadowRoot.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', (e) => store.toggleTask(dateStr, e.target.dataset.id)));
-        this.shadowRoot.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => store.deleteTask(dateStr, e.target.dataset.id)));
+
         
+
+        this.shadowRoot.querySelectorAll('.delete-task-btn').forEach(btn => btn.addEventListener('click', (e) => {
+
+            if(confirm("이 일정을 삭제할까요?")) {
+
+                store.deleteTask(dateStr, e.target.dataset.id);
+
+            }
+
+        }));
+
+
+
+        this.shadowRoot.querySelectorAll('.edit-task-btn').forEach(btn => {
+
+            btn.addEventListener('click', () => {
+
+                const id = btn.dataset.id;
+
+                const taskItem = btn.closest('.task-item');
+
+                                const textSpan = taskItem.querySelector('.task-text');
+
+                                const originalText = textSpan.textContent; 
+
+                
+
+                                // Toggle inline edit mode
+
+                                textSpan.innerHTML = `
+
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+
+                        <input type="text" class="edit-task-input" value="${originalText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+
+                        <button class="save-task-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+
+                        <button class="cancel-task-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+
+                    </div>
+
+                `;
+
+
+
+                const editInput = textSpan.querySelector('.edit-task-input');
+
+                editInput.focus();
+
+                
+
+                // Prevent drag when interacting with input
+
+                editInput.addEventListener('click', (e) => e.stopPropagation());
+
+                editInput.addEventListener('mousedown', (e) => e.stopPropagation());
+
+
+
+                const save = () => {
+
+                    const newText = editInput.value.trim();
+
+                    if (newText && newText !== originalText) {
+
+                        store.updateTask(id, newText);
+
+                    } else {
+
+                        // Re-render handled by store update or manual revert
+
+                        store.loadTasks(); // simpler to just reload or let snapshot handle it, but for cancel we can just revert text
+
+                    }
+
+                };
+
+
+
+                textSpan.querySelector('.save-task-btn').addEventListener('click', (e) => {
+
+                    e.stopPropagation();
+
+                    save();
+
+                });
+
+
+
+                                textSpan.querySelector('.cancel-task-btn').addEventListener('click', (e) => {
+
+
+
+                                    e.stopPropagation();
+
+
+
+                                    textSpan.textContent = originalText; 
+
+
+
+                                    store.loadTasks(); // Refresh to be safe
+
+
+
+                                });
+
+
+
+                editInput.addEventListener('keypress', (e) => {
+
+                    if (e.key === 'Enter') {
+
+                        save();
+
+                    }
+
+                });
+
+            });
+
+        });
+
+
+
         // ... (rest of the suggestion logic etc) ...
+
         const taskInput = this.shadowRoot.getElementById('task-input');
+
         const suggestionsBox = this.shadowRoot.getElementById('suggestions');
+
         const addTaskBtn = this.shadowRoot.getElementById('add-task-btn');
 
+
+
         const handleAddTask = () => {
+
             if (taskInput && taskInput.value.trim()) {
+
                 store.addTask(dateStr, taskInput.value.trim());
+
                 taskInput.value = '';
+
                 if(suggestionsBox) suggestionsBox.classList.remove('active');
+
             }
+
         };
 
+
+
         if(taskInput) {
+
             taskInput.addEventListener('keypress', (e) => { if(e.key==='Enter') handleAddTask(); });
+
             taskInput.addEventListener('input', (e) => {
+
                 const val = e.target.value;
+
                 const lastAt = val.lastIndexOf('@');
+
                 if (lastAt !== -1) {
+
                     const query = val.substring(lastAt + 1).toLowerCase();
+
                     const mutuals = store.state.blooms.filter(f => f.blooms && f.blooms.includes(store.state.user.uid));
+
                     const matches = mutuals.filter(f => f.nickname.toLowerCase().startsWith(query));
+
                     if (matches.length > 0) {
+
                         suggestionsBox.innerHTML = matches.map(f => `<div class="suggestion-item" data-nick="${f.nickname}"><img src="${f.photoURL || '/assets/logo.svg'}" alt="${f.nickname}'s profile">${f.nickname}</div>`).join('');
+
                         suggestionsBox.classList.add('active');
+
                         suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
+
                             item.addEventListener('click', () => {
+
                                 const nick = item.dataset.nick;
+
                                 const before = val.substring(0, lastAt);
+
                                 taskInput.value = `${before}@${nick} `;
+
                                 taskInput.focus();
+
                                 suggestionsBox.classList.remove('active');
+
                             });
+
                         });
+
                     } else { suggestionsBox.classList.remove('active'); }
+
                 } else { suggestionsBox.classList.remove('active'); }
+
             });
+
         }
 
+
+
         if(addTaskBtn) {
+
             addTaskBtn.addEventListener('click', handleAddTask);
+
         }
+
+
+
+        // Drag and Drop Logic
+
+        const taskList = this.shadowRoot.getElementById('task-list');
+
+        if (taskList && !store.state.viewingUser) {
+
+            taskList.addEventListener('dragstart', (e) => {
+
+                e.target.classList.add('dragging');
+
+                e.dataTransfer.effectAllowed = 'move';
+
+            });
+
+
+
+            taskList.addEventListener('dragend', (e) => {
+
+                e.target.classList.remove('dragging');
+
+            });
+
+
+
+            taskList.addEventListener('dragover', (e) => {
+
+                e.preventDefault();
+
+                const afterElement = this.getDragAfterElement(taskList, e.clientY);
+
+                const draggable = taskList.querySelector('.dragging');
+
+                if (draggable) {
+
+                    if (afterElement == null) {
+
+                        taskList.appendChild(draggable);
+
+                    } else {
+
+                        taskList.insertBefore(draggable, afterElement);
+
+                    }
+
+                }
+
+            });
+
+            
+
+             taskList.addEventListener('drop', (e) => {
+
+                e.preventDefault();
+
+                const draggable = taskList.querySelector('.dragging');
+
+                if(!draggable) return;
+
+
+
+                const currentTasks = store.state.tasks[dateStr];
+
+                const reorderedTasks = [];
+
+                
+
+                taskList.querySelectorAll('.task-item').forEach(item => {
+
+                    const originalIndex = parseInt(item.dataset.index);
+
+                    if(currentTasks[originalIndex]) {
+
+                         reorderedTasks.push(currentTasks[originalIndex]);
+
+                    }
+
+                });
+
+                
+
+                store.reorderTasks(dateStr, reorderedTasks);
+
+             });
+
+        }
+
     }
+
+
+
+    getDragAfterElement(container, y) {
+
+        const draggableElements = [...container.querySelectorAll('.task-item:not(.dragging)')];
+
+
+
+        return draggableElements.reduce((closest, child) => {
+
+            const box = child.getBoundingClientRect();
+
+            const offset = y - box.top - box.height / 2;
+
+            if (offset < 0 && offset > closest.offset) {
+
+                return { offset: offset, element: child };
+
+            } else {
+
+                return closest;
+
+            }
+
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+
+    }
+
 }customElements.define('daily-view', DailyView);
 
 function renderApp() {
