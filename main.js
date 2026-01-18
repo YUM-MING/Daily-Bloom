@@ -471,7 +471,8 @@ class Store extends EventTarget {
 
   async loadNotifications() {
       if(!this.state.user) return;
-      const q = query(collection(db, "notifications"), where("toUserId", "==", this.state.user.uid), where("read", "==", false));
+      // Fetch ALL notifications for the user (read or unread)
+      const q = query(collection(db, "notifications"), where("toUserId", "==", this.state.user.uid));
       
       let isFirstLoad = true;
 
@@ -482,45 +483,44 @@ class Store extends EventTarget {
           let notifications = [];
           snapshot.forEach(doc => {
               const data = doc.data();
-              const createdAt = data.createdAt ? new Date(data.createdAt) : new Date(); // Fallback to now
+              const createdAt = data.createdAt ? new Date(data.createdAt) : new Date(); 
               
-              // Filter: Only keep if created within last 7 days (relaxed)
               if (createdAt > limitDate) {
                   notifications.push({ id: doc.id, ...data });
               }
           });
           
-          // Sort newest first
           notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           
-          // Limit to max 7 items to prevent clutter
-          if (notifications.length > 7) {
-              notifications = notifications.slice(0, 7);
-          }
-          
-          // Trigger system notification for new items (skip initial load)
-          if (!isFirstLoad && notifications.length > this.state.notifications.length) {
+          // Trigger system notification ONLY for new UNREAD items (skip initial load)
+          if (!isFirstLoad) {
+              // Simple check: if top item is unread and newer than what we had? 
+              // Actually, just checking if we have more unread items than before is complex with read status updates.
+              // Let's just notify if the newest item is UNREAD and likely new (created just now).
               const newest = notifications[0];
-              if (Notification.permission === 'granted') { // Show even if visible for testing
-                  const noti = new Notification('Daily Bloom', {
-                      body: newest.message,
-                      icon: '/assets/logo.svg'
-                  });
-                  noti.onclick = () => {
-                      window.focus();
-                      if (newest.date) {
-                          // We need to access the store instance or dispatch event. 
-                          // Since we are inside Store class, 'this' refers to Store.
-                          this.selectDate(newest.date);
-                      }
-                      noti.close();
-                  };
+              if (newest && !newest.read) {
+                  // Check if this specific ID was already known? simplified for now.
+                  if (Notification.permission === 'granted') { 
+                      const noti = new Notification('Daily Bloom', {
+                          body: newest.message,
+                          icon: '/assets/logo.svg'
+                      });
+                      noti.onclick = () => {
+                          window.focus();
+                          if (newest.date) this.selectDate(newest.date);
+                          noti.close();
+                      };
+                  }
               }
           }
           isFirstLoad = false;
           
           this.setState({ notifications });
       });
+  }
+
+  async deleteNotification(id) {
+      await deleteDoc(doc(db, "notifications", id));
   }
 
   async markNotificationRead(id) {
@@ -1520,8 +1520,15 @@ class AppHeader extends BaseComponent {
             overflow-y: auto;
         }
         .noti-dropdown.active { display: block; }
-        .noti-item { padding: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; font-size: 0.85rem; }
+        .noti-item { padding: 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; font-size: 0.85rem; display: flex; align-items: flex-start; justify-content: space-between; }
         .noti-item:hover { background: var(--bg-color); }
+        .noti-item.read { opacity: 0.5; background: #fafafa; }
+        [data-theme="dark"] .noti-item.read { background: #2a2a2a; }
+        
+        .noti-delete-btn {
+            background: none; border: none; font-size: 1.2rem; color: #999; cursor: pointer; padding: 0 5px; margin-left: 10px;
+        }
+        .noti-delete-btn:hover { color: #ff5252; }
       </style>
       <header>
         <div class="brand" id="logo">
@@ -1557,15 +1564,18 @@ class AppHeader extends BaseComponent {
                 <div class="notification-wrapper">
                     <button class="btn-icon" id="noti-btn">
                         <img src="/assets/bell.svg" alt="Notifications" style="width:100%; height:100%; filter: var(--icon-filter);">
-                        ${store.state.notifications.length > 0 ? `<div class="noti-badge">${store.state.notifications.length}</div>` : ''}
+                        ${store.state.notifications.filter(n => !n.read).length > 0 ? `<div class="noti-badge">${store.state.notifications.filter(n => !n.read).length}</div>` : ''}
                     </button>
                     <div class="noti-dropdown" id="noti-dropdown">
                         ${store.state.notifications.length === 0 ? '<div style="padding:20px; text-align:center; opacity:0.6;">No notifications</div>' : ''}
                         ${store.state.notifications.map(n => `
-                            <div class="noti-item" data-id="${n.id}">
-                                <strong>${n.type === 'bloom' ? '🌸 Bloom' : n.type === 'tag' ? '📌 Tag' : '💬 Bloom'}</strong><br>
-                                ${n.message}
-                                ${n.date ? `<div style="font-size:0.7rem; color:var(--primary-color); margin-top:4px;">Date: ${n.date}</div>` : ''}
+                            <div class="noti-item ${n.read ? 'read' : ''}" data-id="${n.id}">
+                                <div style="flex-grow:1;">
+                                    <strong>${n.type === 'bloom' ? '🌸 Bloom' : n.type === 'tag' ? '📌 Tag' : '💬 Bloom'}</strong><br>
+                                    ${n.message}
+                                    ${n.date ? `<div style="font-size:0.7rem; color:var(--primary-color); margin-top:4px;">Date: ${n.date}</div>` : ''}
+                                </div>
+                                <button class="noti-delete-btn" data-id="${n.id}">&times;</button>
                             </div>
                         `).join('')}
                     </div>
@@ -1727,12 +1737,16 @@ class AppHeader extends BaseComponent {
         });
         
         this.shadowRoot.querySelectorAll('.noti-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', (e) => {
+                // Prevent click if delete button was clicked
+                if (e.target.classList.contains('noti-delete-btn')) return;
+
                 const id = item.dataset.id;
                 const n = store.state.notifications.find(noti => noti.id === id);
                 if(!n) return;
 
                 store.markNotificationRead(id);
+                // ... rest of navigation logic
                 
                 if (n.type === 'bloom') {
                     // Open MyPage and fill email
@@ -1765,6 +1779,16 @@ class AppHeader extends BaseComponent {
         });
     }
 
+        this.shadowRoot.querySelectorAll('.noti-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                if(confirm("알림을 삭제하시겠습니까?")) {
+                    store.deleteNotification(id);
+                }
+            });
+        });
+
     this.shadowRoot.getElementById('logo').addEventListener('click', () => {
         store.goHome();
         document.querySelector('my-page').classList.add('hidden');
@@ -1777,6 +1801,9 @@ class AppHeader extends BaseComponent {
     
     const myPageBtn = this.shadowRoot.getElementById('mypage-btn');
     if(myPageBtn) myPageBtn.addEventListener('click', () => {
+        if (store.state.viewingUser) {
+            store.goHome();
+        }
         document.querySelector('my-page').classList.toggle('hidden');
         document.getElementById('main-content').classList.toggle('hidden');
         document.querySelector('goal-list').classList.toggle('hidden');
