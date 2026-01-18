@@ -3,7 +3,7 @@
 <div align="center">
   <img src="./assets/logo.svg" width="120" alt="Daily Bloom Logo">
   <br />
-  <p><b>"당신의 하루를 아름박게 피워보세요"</b></p>
+  <p><b>"당신의 하루를 아름답게 피워보세요"</b></p>
   <p>MBTI 'J' 성향을 위한 가장 심플하고 감성적인 PWA 플래너</p>
 </div>
 
@@ -21,7 +21,7 @@
 
 ### 🗓️ 스마트 일정 & 동기화
 - **연속 일정 (#d) & 주간 반복 (#w):** 간단한 태그만으로 며칠간의 여행이나 매주 반복되는 업무를 한 번에 등록합니다.
-- **실시간 스마트 동기화:** 태그된 공유 일정은 참여자 중 누군가 수정하거나 삭제하면 모두의 캘린더에 실시간으로 반영됩니다.
+- **다중 태그 & 스마트 동기화:** `@친구1 @친구2` 태그로 여러 명과 일정을 공유하며, 수정 시 모두의 캘린더에 내용이 실시간으로 동기화됩니다. ("누구와 함께" 텍스트 자동 관리)
 - **드래그 앤 드롭:** 일정의 순서를 꾹 눌러서 자유롭게 배치할 수 있습니다.
 
 ### 🔒 3단계 프라이버시 보호
@@ -31,8 +31,8 @@
 
 ### 🔍 지능형 검색 & 알림
 - **그룹화된 검색 결과:** 동일한 내용이나 반복되는 일정은 하나로 묶어 보여주며, 클릭 시 상세 날짜별로 펼쳐지는 효율적인 인터페이스를 제공합니다.
-- **시스템 알림 (Push):** 앱을 닫아두어도 누군가 나를 태그하거나 댓글을 남기면 PC/모바일 시스템 알림으로 즉시 소식을 받습니다.
-- **7일 알림 보관:** 확인한 알림도 7일간 유지되어 언제든 지난 소식을 다시 확인할 수 있습니다.
+- **시스템 알림 (Push):** 앱을 닫아두어도 누군가 나를 태그하거나 댓글을 남기면 PC/모바일 시스템 알림으로 즉시 소식을 받습니다. (7일 보관, 개별 삭제 지원)
+- **스마트 알림 버튼:** 현재 권한 상태에 따라 알림 켜기/끄기 가이드를 동적으로 제공합니다.
 
 ### 📱 강력한 PWA 앱 경험
 - **앱 설치 지원:** 브라우저 주소창 없이 홈 화면에 아이콘을 추가하여 진짜 앱처럼 전체 화면으로 사용할 수 있습니다.
@@ -50,7 +50,7 @@
 - **Frontend:** Vanilla JavaScript (ES6+), Web Components, Modern CSS (Oklch, scrollbar-gutter)
 - **PWA:** Manifest JSON, Service Worker (Caching & Push Notification)
 - **Backend:** Firebase Authentication (Google OAuth), Cloud Firestore (Real-time Sync)
-- **Security:** Firebase Security Rules (Server-side data protection)
+- **Security:** Firebase Security Rules (Role-based access control)
 - **Analysis:** Google Analytics 4, Microsoft Clarity
 
 <br />
