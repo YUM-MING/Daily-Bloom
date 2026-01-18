@@ -1097,23 +1097,56 @@ class Store extends EventTarget {
       });
   }
 
-  async addComment(dateStr, text) {
+  async addComment(dateStr, text, parentId = null) {
       if(!this.state.user) return;
       const targetUid = this.state.viewingUser ? this.state.viewingUser.uid : this.state.user.uid;
       
-      await addDoc(collection(db, "comments"), {
+      const newComment = {
           date: dateStr,
           toUserId: targetUid, 
           fromUserId: this.state.user.uid,
           author: this.state.user.nickname,
           authorPhoto: this.state.user.photoURL,
           text,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          parentId: parentId // New field for threading
+      };
+
+      const docRef = await addDoc(collection(db, "comments"), newComment);
+      
+      // --- Smart Notifications ---
+      const participants = new Set();
+      
+      if (parentId) {
+          // It's a reply! Find everyone involved in this thread
+          // 1. Original Commenter
+          const parentDoc = await getDoc(doc(db, "comments", parentId));
+          if (parentDoc.exists()) {
+              participants.add(parentDoc.data().fromUserId);
+          }
+          
+          // 2. Other Repliers
+          const q = query(collection(db, "comments"), where("parentId", "==", parentId));
+          const snapshot = await getDocs(q);
+          snapshot.forEach(d => participants.add(d.data().fromUserId));
+      }
+
+      // 3. Calendar Owner
+      participants.add(targetUid);
+
+      // 4. Send to everyone except ME (the one replying)
+      const notifyPromises = [];
+      participants.forEach(uid => {
+          if (uid !== this.state.user.uid) {
+              const msg = parentId 
+                ? `${this.state.user.nickname}님이 대화에 답장을 남겼습니다: ${text}`
+                : `${this.state.user.nickname}님이 회원님의 달력(${dateStr})에 블룸을 남겼습니다!`;
+              
+              notifyPromises.push(this.sendNotification(uid, 'comment', msg, null, dateStr));
+          }
       });
       
-      if(targetUid !== this.state.user.uid) {
-          await this.sendNotification(targetUid, 'comment', `${this.state.user.nickname}님이 회원님의 달력(${dateStr})에 블룸을 남겼습니다!`, null, dateStr);
-      }
+      await Promise.all(notifyPromises);
   }
 
   async updateComment(commentId, newText) {
@@ -2631,51 +2664,121 @@ class DailyView extends BaseComponent {
 
                 <div class="section-title" style="margin-top: 20px;">${store.t.commentsTitle}</div>
 
-                <div id="comment-list" style="overflow-y:auto; max-height: 200px;">
+                                <div id="comment-list" style="overflow-y:auto; max-height: 300px;">
 
-                    ${comments.length === 0 ? `<p style="opacity:0.5; font-size:0.85rem; text-align: center; margin: 15px 0;">${store.t.noComments}</p>` : ''}
+                                    ${comments.length === 0 ? `<p style="opacity:0.5; font-size:0.85rem; text-align: center; margin: 15px 0;">${store.t.noComments}</p>` : ''}
 
-                    ${comments.map(c => {
+                                    ${(() => {
 
-                        const isAuthor = store.state.user && c.fromUserId === store.state.user.uid;
+                                        // Threading Logic for display
 
-                        return `
+                                        const topLevel = comments.filter(c => !c.parentId);
 
-                        <div class="comment-item" style="display:flex; gap:10px; align-items:flex-start; margin-bottom: 10px;">
+                                        const replies = comments.filter(c => c.parentId);
 
-                            <img src="${c.authorPhoto || '/assets/logo.svg'}" alt="${c.author}'s profile" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
+                                        
 
-                            <div style="flex-grow:1;">
+                                        return topLevel.map(c => {
 
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                            const isAuthor = store.state.user && c.fromUserId === store.state.user.uid;
 
-                                    <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${c.fromUserId}">${c.author}</div>
+                                            const childReplies = replies.filter(r => r.parentId === c.id);
 
-                                    ${isAuthor ? `
+                                            
 
-                                        <div style="display:flex; gap:8px;">
+                                            return `
 
-                                            <button class="edit-comment-btn" data-id="${c.id}" data-text="${c.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.7rem; cursor:pointer; padding:0;">Edit</button>
+                                            <div class="comment-container" style="margin-bottom: 15px;">
 
-                                            <button class="delete-comment-btn" data-id="${c.id}" style="background:none; border:none; color:#ff5252; font-size:0.7rem; cursor:pointer; padding:0;">Delete</button>
+                                                <div class="comment-item" style="display:flex; gap:10px; align-items:flex-start;">
 
-                                        </div>
+                                                    <img src="${c.authorPhoto || '/assets/logo.svg'}" alt="${c.author}'s profile" style="width:30px; height:30px; border-radius:50%; object-fit:cover; margin-top:3px; cursor:pointer;" class="commenter-avatar" data-uid="${c.fromUserId}">
 
-                                    ` : ''}
+                                                    <div style="flex-grow:1;">
+
+                                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+
+                                                            <div style="font-weight:bold; font-size:0.8rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${c.fromUserId}">${c.author}</div>
+
+                                                            <div style="display:flex; gap:8px;">
+
+                                                                <button class="reply-comment-btn" data-id="${c.id}" style="background:none; border:none; color:var(--primary-color); font-size:0.7rem; cursor:pointer; padding:0;">Reply</button>
+
+                                                                ${isAuthor ? `
+
+                                                                    <button class="edit-comment-btn" data-id="${c.id}" data-text="${c.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.7rem; cursor:pointer; padding:0;">Edit</button>
+
+                                                                    <button class="delete-comment-btn" data-id="${c.id}" style="background:none; border:none; color:#ff5252; font-size:0.7rem; cursor:pointer; padding:0;">Delete</button>
+
+                                                                ` : ''}
+
+                                                            </div>
+
+                                                        </div>
+
+                                                        <div class="comment-text" style="font-size:0.9rem;">${c.text}</div>
+
+                                                        <!-- Inline Reply Input Container -->
+
+                                                        <div class="reply-input-container hidden" id="reply-to-${c.id}" style="margin-top:10px;"></div>
+
+                                                    </div>
+
+                                                </div>
+
+                                                <!-- Render Child Replies -->
+
+                                                ${childReplies.map(r => {
+
+                                                    const isReplyAuthor = store.state.user && r.fromUserId === store.state.user.uid;
+
+                                                    return `
+
+                                                    <div class="comment-item reply" style="display:flex; gap:10px; align-items:flex-start; margin-left: 40px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+
+                                                        <div style="font-size: 0.8rem; opacity: 0.4;">↳</div>
+
+                                                        <img src="${r.authorPhoto || '/assets/logo.svg'}" alt="${r.author}'s profile" style="width:24px; height:24px; border-radius:50%; object-fit:cover; margin-top:2px; cursor:pointer;" class="commenter-avatar" data-uid="${r.fromUserId}">
+
+                                                        <div style="flex-grow:1;">
+
+                                                            <div style="display:flex; justify-content:space-between; align-items:center;">
+
+                                                                <div style="font-weight:bold; font-size:0.75rem; color:var(--primary-hover); cursor:pointer;" class="commenter-name" data-uid="${r.fromUserId}">${r.author}</div>
+
+                                                                ${isReplyAuthor ? `
+
+                                                                    <div style="display:flex; gap:8px;">
+
+                                                                        <button class="edit-comment-btn" data-id="${r.id}" data-text="${r.text}" style="background:none; border:none; color:var(--accent-color); font-size:0.65rem; cursor:pointer; padding:0;">Edit</button>
+
+                                                                        <button class="delete-comment-btn" data-id="${r.id}" style="background:none; border:none; color:#ff5252; font-size:0.65rem; cursor:pointer; padding:0;">Delete</button>
+
+                                                                    </div>
+
+                                                                ` : ''}
+
+                                                            </div>
+
+                                                            <div class="comment-text" style="font-size:0.85rem;">${r.text}</div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    `;
+
+                                                }).join('')}
+
+                                            </div>
+
+                                            `;
+
+                                        }).join('');
+
+                                    })()}
 
                                 </div>
-
-                                <div class="comment-text" style="font-size:0.9rem;">${c.text}</div>
-
-                            </div>
-
-                        </div>
-
-                        `;
-
-                    }).join('')}
-
-                </div>
 
                 <div class="input-group" style="margin-top: 5px;">
 
@@ -2749,93 +2852,459 @@ class DailyView extends BaseComponent {
 
 
 
-        this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
-
-            btn.addEventListener('click', () => {
-
-                const id = btn.dataset.id;
-
-                const commentItem = btn.closest('.comment-item');
-
-                const textDiv = commentItem.querySelector('.comment-text');
-
-                const oldText = textDiv.textContent;
+                        this.shadowRoot.querySelectorAll('.edit-comment-btn').forEach(btn => {
 
 
 
-                // Toggle inline edit mode
-
-                textDiv.innerHTML = `
-
-                    <div style="display:flex; gap:5px; margin-top:5px;">
-
-                        <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
-
-                        <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
-
-                        <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
-
-                    </div>
-
-                `;
+                            btn.addEventListener('click', () => {
 
 
 
-                const editInput = textDiv.querySelector('.edit-input');
-
-                editInput.focus();
+                                const id = btn.dataset.id;
 
 
 
-                textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
-
-                    const newText = editInput.value.trim();
-
-                    if (newText && newText !== oldText) {
-
-                        store.updateComment(id, newText);
-
-                    } else {
-
-                        textDiv.textContent = oldText; // Restore if no change
-
-                    }
-
-                });
+                                const commentItem = btn.closest('.comment-item');
 
 
 
-                textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
-
-                    textDiv.textContent = oldText;
-
-                });
+                                const textDiv = commentItem.querySelector('.comment-text');
 
 
 
-                editInput.addEventListener('keypress', (e) => {
+                                const oldText = textDiv.textContent;
 
-                    if (e.key === 'Enter') {
 
-                        const newText = editInput.value.trim();
 
-                        if (newText && newText !== oldText) {
+                
 
-                            store.updateComment(id, newText);
 
-                        } else {
 
-                            textDiv.textContent = oldText;
+                                // Toggle inline edit mode
+
+
+
+                                textDiv.innerHTML = `
+
+
+
+                                    <div style="display:flex; gap:5px; margin-top:5px;">
+
+
+
+                                        <input type="text" class="edit-input" value="${oldText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+
+
+
+                                        <button class="save-edit-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+
+
+
+                                        <button class="cancel-edit-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+
+
+
+                                    </div>
+
+
+
+                                `;
+
+
+
+                
+
+
+
+                                const editInput = textDiv.querySelector('.edit-input');
+
+
+
+                                editInput.focus();
+
+
+
+                
+
+
+
+                                textDiv.querySelector('.save-edit-btn').addEventListener('click', () => {
+
+
+
+                                    const newText = editInput.value.trim();
+
+
+
+                                    if (newText && newText !== oldText) {
+
+
+
+                                        store.updateComment(id, newText);
+
+
+
+                                    } else {
+
+
+
+                                        textDiv.textContent = oldText; // Restore if no change
+
+
+
+                                    }
+
+
+
+                                });
+
+
+
+                
+
+
+
+                                textDiv.querySelector('.cancel-edit-btn').addEventListener('click', () => {
+
+
+
+                                    textDiv.textContent = oldText;
+
+
+
+                                });
+
+
+
+                
+
+
+
+                                editInput.addEventListener('keypress', (e) => {
+
+
+
+                                    if (e.key === 'Enter') {
+
+
+
+                                        const newText = editInput.value.trim();
+
+
+
+                                        if (newText && newText !== oldText) {
+
+
+
+                                            store.updateComment(id, newText);
+
+
+
+                                        } else {
+
+
+
+                                            textDiv.textContent = oldText;
+
+
+
+                                        }
+
+
+
+                                    }
+
+
+
+                                });
+
+
+
+                            });
+
+
+
+                        });
+
+
+
+                
+
+
+
+                        // Reply Logic
+
+
+
+                        this.shadowRoot.querySelectorAll('.reply-comment-btn').forEach(btn => {
+
+
+
+                            btn.addEventListener('click', () => {
+
+
+
+                                const id = btn.dataset.id;
+
+
+
+                                const container = this.shadowRoot.getElementById(`reply-to-${id}`);
+
+
+
+                                
+
+
+
+                                if (!container.classList.contains('hidden')) {
+
+
+
+                                    container.classList.add('hidden');
+
+
+
+                                    return;
+
+
+
+                                }
+
+
+
+                
+
+
+
+                                container.innerHTML = `
+
+
+
+                                    <div style="display:flex; gap:5px;">
+
+
+
+                                        <input type="text" class="reply-input" placeholder="답글을 남겨보세요..." style="flex-grow:1; font-size:0.8rem; padding:6px 10px;">
+
+
+
+                                        <button class="send-reply-btn btn-primary" style="font-size:0.7rem; padding:6px 12px;">Send</button>
+
+
+
+                                    </div>
+
+
+
+                                `;
+
+
+
+                                container.classList.remove('hidden');
+
+
+
+                                
+
+
+
+                                const input = container.querySelector('.reply-input');
+
+
+
+                                input.focus();
+
+
+
+                
+
+
+
+                                const sendReply = async () => {
+
+
+
+                                    const val = input.value.trim();
+
+
+
+                                    if (val) {
+
+
+
+                                        await store.addComment(dateStr, val, id);
+
+
+
+                                        container.classList.add('hidden');
+
+
+
+                                    }
+
+
+
+                                };
+
+
+
+                
+
+
+
+                                container.querySelector('.send-reply-btn').addEventListener('click', sendReply);
+
+
+
+                                input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendReply(); });
+
+
+
+                            });
+
+
+
+                        });
+
+
+
+        
+
+
+
+                // Reply Logic
+
+
+
+                this.shadowRoot.querySelectorAll('.reply-comment-btn').forEach(btn => {
+
+
+
+                    btn.addEventListener('click', () => {
+
+
+
+                        const id = btn.dataset.id;
+
+
+
+                        const container = this.shadowRoot.getElementById(`reply-to-${id}`);
+
+
+
+                        
+
+
+
+                        if (!container.classList.contains('hidden')) {
+
+
+
+                            container.classList.add('hidden');
+
+
+
+                            return;
+
+
 
                         }
 
-                    }
+
+
+        
+
+
+
+                        container.innerHTML = `
+
+
+
+                            <div style="display:flex; gap:5px;">
+
+
+
+                                <input type="text" class="reply-input" placeholder="답글을 남겨보세요..." style="flex-grow:1; font-size:0.8rem; padding:6px 10px;">
+
+
+
+                                <button class="send-reply-btn btn-primary" style="font-size:0.7rem; padding:6px 12px;">Send</button>
+
+
+
+                            </div>
+
+
+
+                        `;
+
+
+
+                        container.classList.remove('hidden');
+
+
+
+                        
+
+
+
+                        const input = container.querySelector('.reply-input');
+
+
+
+                        input.focus();
+
+
+
+        
+
+
+
+                        const sendReply = async () => {
+
+
+
+                            const val = input.value.trim();
+
+
+
+                            if (val) {
+
+
+
+                                await store.addComment(dateStr, val, id);
+
+
+
+                                container.classList.add('hidden');
+
+
+
+                            }
+
+
+
+                        };
+
+
+
+        
+
+
+
+                        container.querySelector('.send-reply-btn').addEventListener('click', sendReply);
+
+
+
+                        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendReply(); });
+
+
+
+                    });
+
+
 
                 });
-
-            });
-
-        });
 
 
 
