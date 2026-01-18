@@ -30,6 +30,9 @@ const TRANSLATIONS = {
     mutual: "Mutual Bloom",
     setNickname: "Set Nickname",
     selectDatePrompt: "Select a date from the calendar to view details.",
+    copyInvite: "🔗 Copy Invite Link (Auto Mutual Bloom)",
+    inviteDesc: "Send this link to a friend for instant mutual blooming!",
+    installApp: "⬇️ Install App",
   },
   ko: {
     appTitle: "Daily Bloom",
@@ -56,6 +59,9 @@ const TRANSLATIONS = {
     mutual: "서로 블룸",
     setNickname: "닉네임 설정",
     selectDatePrompt: "날짜를 선택하여 상세 일정을 확인하세요.",
+    copyInvite: "🔗 내 초대 링크 복사하기 (자동 맞블룸)",
+    inviteDesc: "링크를 친구에게 보내면 수락 한 번으로 서로 친구가 됩니다.",
+    installApp: "⬇️ 앱 설치하고 편하게 쓰기",
   }
 };
 
@@ -77,10 +83,31 @@ class Store extends EventTarget {
       blooms: [], 
       notifications: [], 
       viewingUser: null,
+      deferredPrompt: null, // For PWA install
     };
 
     this.initTheme();
     this.initAuth();
+    
+    // Capture PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        this.state.deferredPrompt = e;
+        // Dispatch event to let components know install is available
+        this.dispatchEvent(new CustomEvent('install-available'));
+    });
+  }
+
+  async installApp() {
+      const promptEvent = this.state.deferredPrompt;
+      if (!promptEvent) return;
+      
+      promptEvent.prompt();
+      const result = await promptEvent.userChoice;
+      console.log('User choice:', result.outcome);
+      
+      this.state.deferredPrompt = null;
+      this.dispatchEvent(new CustomEvent('state-changed', { detail: this.state }));
   }
 
   get t() {
@@ -130,6 +157,18 @@ class Store extends EventTarget {
                       // Remove param from URL to prevent loop/re-trigger
                       window.history.replaceState({}, document.title, "/");
                       await this.handleInvite(inviteUid);
+                  }
+                  
+                  // Request Notification Permission (if supported)
+                  if ('Notification' in window) {
+                      this.requestNotificationPermission();
+                  }
+
+                  // Auto-show Help Modal once
+                  if (!localStorage.getItem('helpShown')) {
+                      const helpModal = document.createElement('help-modal');
+                      document.body.appendChild(helpModal);
+                      localStorage.setItem('helpShown', 'true');
                   }
 
                   // Show App
@@ -236,6 +275,22 @@ class Store extends EventTarget {
 
   // --- Firestore Actions ---
 
+  async requestNotificationPermission() {
+      try {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+              console.log('Notification permission granted.');
+              // In a real app with Cloud Functions, we would get the FCM token here:
+              // const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' });
+              // await updateDoc(doc(db, "users", this.state.user.uid), { fcmToken: token });
+          } else {
+              console.log('Unable to get permission to notify.');
+          }
+      } catch (e) {
+          console.error('Error requesting notification permission:', e);
+      }
+  }
+
   async handleInvite(targetUid) {
       if (targetUid === this.state.user.uid) {
           alert("자기 자신과는 블룸을 맺을 수 없습니다.");
@@ -317,10 +372,26 @@ class Store extends EventTarget {
   async loadNotifications() {
       if(!this.state.user) return;
       const q = query(collection(db, "notifications"), where("toUserId", "==", this.state.user.uid), where("read", "==", false));
+      
+      let isFirstLoad = true;
+
       onSnapshot(q, (snapshot) => {
           const notifications = [];
           snapshot.forEach(doc => notifications.push({ id: doc.id, ...doc.data() }));
           notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          
+          // Trigger system notification for new items (skip initial load)
+          if (!isFirstLoad && notifications.length > this.state.notifications.length) {
+              const newest = notifications[0];
+              if (Notification.permission === 'granted' && document.visibilityState === 'hidden') {
+                  new Notification('Daily Bloom', {
+                      body: newest.message,
+                      icon: '/assets/logo.svg'
+                  });
+              }
+          }
+          isFirstLoad = false;
+          
           this.setState({ notifications });
       });
   }
@@ -340,6 +411,10 @@ class Store extends EventTarget {
           read: false,
           createdAt: new Date().toISOString()
       });
+      
+      // Since we don't have Cloud Functions for real push yet, 
+      // we can try to trigger a local notification if we are testing on the same device (e.g. self-test)
+      // or rely on the receiver's app to pick up the change via onSnapshot (which we already do for in-app badge).
   }
 
   async loadGoals() {
@@ -782,6 +857,88 @@ class BaseComponent extends HTMLElement {
   }
 }
 
+class HelpModal extends BaseComponent {
+    connectedCallback() {
+        this.render();
+    }
+
+    render() {
+        this.shadowRoot.innerHTML = `
+            <style>
+                @import url('/style.css');
+                .modal-overlay {
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0, 0, 0, 0.5); z-index: 2000;
+                    display: flex; justify-content: center; align-items: center;
+                }
+                .modal-content {
+                    background: var(--surface-color); padding: 25px; border-radius: 16px;
+                    width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative;
+                }
+                .close-btn {
+                    position: absolute; top: 15px; right: 15px; font-size: 1.5rem;
+                    background: none; border: none; cursor: pointer; color: var(--text-color);
+                }
+                h2 { color: var(--primary-color); text-align: center; margin-bottom: 20px; font-family: 'Dancing Script', cursive; }
+                .guide-item { margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+                .guide-item:last-child { border-bottom: none; }
+                .guide-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; color: var(--primary-hover); }
+                .guide-desc { font-size: 0.95rem; line-height: 1.5; color: var(--text-color); }
+                code { background: var(--bg-color); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: bold; }
+            </style>
+            <div class="modal-overlay" id="overlay">
+                <div class="modal-content">
+                    <button class="close-btn" id="close">&times;</button>
+                    <h2>Daily Bloom Guide</h2>
+                    
+                    <div class="guide-item">
+                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 친구야, 내가 써줄게! (@태그)</div>
+                        <div class="guide-desc">
+                            일정 입력 시 <code>@친구닉네임</code>을 입력하면 일정이 자동으로 공유됩니다.<br>
+                            <em>예: "점심 약속 @지민" → 지민이의 캘린더에도 자동 등록!</em>
+                        </div>
+                    </div>
+
+                    <div class="guide-item">
+                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 2박 3일 여행도 한 번에! (#d기간)</div>
+                        <div class="guide-desc">
+                            일정 뒤에 <code>#d3</code>을 붙이면 3일짜리 연결된 일정이 생성됩니다.<br>
+                            <em>예: "제주도 여행 #d3" → 오늘부터 3일간 바(Bar) 생성</em>
+                        </div>
+                    </div>
+
+                    <div class="guide-item">
+                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 매주 돌아오는 업무! (#w반복)</div>
+                        <div class="guide-desc">
+                            일정 뒤에 <code>#w4</code>를 붙이면 4주 동안 매주 같은 요일에 반복됩니다.<br>
+                            <em>예: "주간 회의 #w10" → 10주 동안 반복 등록</em>
+                        </div>
+                    </div>
+
+                    <div class="guide-item">
+                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 1초 만에 친구 맺기</div>
+                        <div class="guide-desc">
+                            [마이페이지]에서 <strong>초대 링크</strong>를 복사해 친구에게 보내세요.<br>
+                            친구가 링크를 누르면 복잡한 과정 없이 바로 <strong>맞블룸(친구)</strong>이 됩니다.
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888;">
+                        다시 보고 싶으면 우측 상단의 <strong>❤️ 하트 아이콘</strong>을 눌러주세요!
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.shadowRoot.getElementById('close').addEventListener('click', () => this.remove());
+        this.shadowRoot.getElementById('overlay').addEventListener('click', (e) => {
+            if (e.target === this.shadowRoot.getElementById('overlay')) this.remove();
+        });
+    }
+}
+customElements.define('help-modal', HelpModal);
+
 class AppLogin extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); }
   connectedCallback() { this.render(); }
@@ -861,9 +1018,16 @@ class MyPage extends BaseComponent {
                 <div style="border-top: 1px solid var(--border-color); margin: 20px 0;"></div>
 
                 <h3>${t.addFriend}</h3>
+                
+                ${store.state.deferredPrompt ? `
+                    <div style="margin-bottom: 15px;">
+                        <button class="btn-primary" id="install-app-btn" style="width:100%; background: #333; color: white;">${t.installApp}</button>
+                    </div>
+                ` : ''}
+
                 <div style="margin-bottom: 15px; text-align: center;">
-                    <button class="btn-primary" id="copy-invite-btn" style="width:100%; background: linear-gradient(45deg, #ffc1cc, #ffb7c5); border:none; padding: 12px;">🔗 내 초대 링크 복사하기 (자동 맞블룸)</button>
-                    <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">링크를 친구에게 보내면 수락 한 번으로 서로 친구가 됩니다.</div>
+                    <button class="btn-primary" id="copy-invite-btn" style="width:100%; background: linear-gradient(45deg, #ffc1cc, #ffb7c5); border:none; padding: 12px;">${t.copyInvite}</button>
+                    <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">${t.inviteDesc}</div>
                 </div>
                 <div class="friend-search input-row" style="margin-bottom: 15px;">
                     <input type="email" id="friend-email" placeholder="${t.searchFriend}">
@@ -920,6 +1084,13 @@ class MyPage extends BaseComponent {
             const email = this.shadowRoot.getElementById('friend-email').value;
             if(email) store.addBloom(email);
         });
+        
+        const installBtn = this.shadowRoot.getElementById('install-app-btn');
+        if (installBtn) {
+            installBtn.addEventListener('click', () => {
+                store.installApp();
+            });
+        }
 
         this.shadowRoot.getElementById('copy-invite-btn').addEventListener('click', () => {
             const link = `${window.location.origin}?invite=${user.uid}`;
@@ -1767,137 +1938,148 @@ class DailyView extends BaseComponent {
 
         this.shadowRoot.innerHTML = `
 
-            <style>
+                        <style>
 
-                @import url('/style.css');
+                            @import url('/style.css');
 
-                :host { display: block; }
+                            :host { display: block; }
 
-                .daily-panel { background: var(--surface-color); border-radius: 12px; padding: 20px; min-height: 200px; display: block; position: relative; }
+                            .daily-panel { background: var(--surface-color); border-radius: 12px; padding: 20px; min-height: 200px; display: block; position: relative; }
 
-                .task-item, .comment-item { border-bottom: 1px solid var(--border-color); padding: 10px 0; }
+                            
 
-                .task-item.dragging { opacity: 0.5; background: var(--bg-color); border: 1px dashed var(--primary-color); }
+                            #help-trigger {
 
-                .completed { text-decoration: line-through; opacity: 0.5; }
+                                position: absolute;
 
-                                .section-title { font-size: 1.1rem; font-weight: bold; margin: 20px 0 10px; color: var(--primary-color); }
+                                top: 18px;
 
-                                .input-group { display: flex; gap: 8px; margin-top: 10px; position: relative; width: 100%; }
+                                right: 20px;
 
-                                .input-group input { flex: 1; min-width: 0; } /* Crucial for preventing overflow */
+                                background: none;
 
-                                .input-group button { flex-shrink: 0; white-space: nowrap; } /* Prevent button text wrapping/squashing */
+                                border: none;
 
-                                
+                                font-size: 1.2rem;
 
-                                .mobile-close { display: none; position: absolute; top: 15px; right: 15px; font-size: 1.5rem; color: var(--text-color); cursor: pointer; z-index: 10; }
+                                cursor: pointer;
 
+                                opacity: 0.7;
 
+                                transition: transform 0.2s;
 
-                @media (max-width: 1024px) {
+                                z-index: 11;
 
-                    :host {
+                            }
 
-                        position: fixed;
-
-                        top: 0;
-
-                        left: 0;
-
-                        width: 100%;
-
-                        height: 100%;
-
-                        background: rgba(0,0,0,0.5);
-
-                        z-index: 2000;
-
-                        display: flex;
-
-                        justify-content: center;
-
-                        align-items: center;
-
-                        padding: 20px;
-
-                        box-sizing: border-box;
-
-                    }
-
-                    .daily-panel {
-
-                        width: 100%;
-
-                        max-width: 500px;
-
-                        max-height: 80vh;
-
-                        overflow-y: auto;
-
-                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-
-                    }
-
-                    .mobile-close { display: block; }
-
-                }
-
-
-
-                .friend-suggestions {
-
-                    position: absolute;
-
-                    bottom: 100%;
-
-                    left: 0;
-
-                    background: var(--surface-color);
-
-                    border: 1px solid var(--border-color);
-
-                    border-radius: 8px;
-
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-
-                    width: 200px;
-
-                    max-height: 150px;
-
-                    overflow-y: auto;
-
-                    display: none;
-
-                    z-index: 10;
-
-                }
-
-                .friend-suggestions.active { display: block; }
-
-                .suggestion-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-
-                .suggestion-item:hover { background: var(--bg-color); }
-
-                .suggestion-item img { width: 24px; height: 24px; border-radius: 50%; }
-
-            </style>
+                            #help-trigger:hover { transform: scale(1.2); opacity: 1; }
 
             
 
-            <div class="daily-panel">
+                            .task-item, .comment-item { border-bottom: 1px solid var(--border-color); padding: 10px 0; }
 
-                <span class="mobile-close" id="close-view">&times;</span>
+                            .task-item.dragging { opacity: 0.5; background: var(--bg-color); border: 1px dashed var(--primary-color); }
 
-                <h2 style="margin-bottom:10px;">${dateStr}</h2>
+                            
 
-                <div class="section-title">${taskTitle}</div>
+                            .mobile-close { display: none; position: absolute; top: 15px; right: 15px; font-size: 1.5rem; color: var(--text-color); cursor: pointer; z-index: 10; }
 
-                <div id="task-list">
+            
 
-                    ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${store.t.noTasks}</p>` : ''}
+                            @media (max-width: 1024px) {
 
-                    ${tasks.map((t, index) => {
+                                :host {
+
+                                    position: fixed;
+
+                                    top: 0;
+
+                                    left: 0;
+
+                                    width: 100%;
+
+                                    height: 100%;
+
+                                    background: rgba(0,0,0,0.5);
+
+                                    z-index: 2000;
+
+                                    display: flex;
+
+                                    justify-content: center;
+
+                                    align-items: center;
+
+                                    padding: 20px;
+
+                                    box-sizing: border-box;
+
+                                }
+
+                                .daily-panel {
+
+                                    width: 100%;
+
+                                    max-width: 500px;
+
+                                    max-height: 80vh;
+
+                                    overflow-y: auto;
+
+                                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+
+                                }
+
+                                .mobile-close { display: block; }
+
+                                /* Offset help button when close button is visible */
+
+                                #help-trigger { right: 50px; top: 16px; }
+
+                            }
+
+                                .friend-suggestions {
+                                    position: absolute;
+                                    bottom: 100%;
+                                    left: 0;
+                                    background: var(--surface-color);
+                                    border: 1px solid var(--border-color);
+                                    border-radius: 8px;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                                    width: 200px;
+                                    max-height: 150px;
+                                    overflow-y: auto;
+                                    display: none;
+                                    z-index: 10;
+                                }
+                                .friend-suggestions.active { display: block; }
+                                .suggestion-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+                                .suggestion-item:hover { background: var(--bg-color); }
+                                .suggestion-item img { width: 24px; height: 24px; border-radius: 50%; }
+
+                                .input-group { display: flex; gap: 8px; margin-top: 10px; position: relative; width: 100%; align-items: center; }
+                                .input-group input { flex: 1; min-width: 0; }
+                                .input-group button { flex-shrink: 0; white-space: nowrap; }
+
+                        </style>
+
+                        
+
+                        <div class="daily-panel">
+
+                            <span class="mobile-close" id="close-view">&times;</span>
+
+                            <button id="help-trigger" title="사용법 보기">❤️</button>
+
+                            <h2 style="margin-bottom:10px;">${dateStr}</h2>
+
+                            <div class="section-title">${taskTitle}</div>
+
+                                <div id="task-list">
+
+                                    ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem; text-align: center; padding: 20px 0;">${store.t.noTasks}</p>` : ''}
+
+                                    ${tasks.map((t, index) => {
 
                         const isMulti = t.duration && t.duration > 1;
 
@@ -2011,13 +2193,51 @@ class DailyView extends BaseComponent {
 
         
 
-        const closeBtn = this.shadowRoot.getElementById('close-view');
+                const closeBtn = this.shadowRoot.getElementById('close-view');
 
-        if(closeBtn) closeBtn.addEventListener('click', () => store.setState({ selectedDate: null }));
+        
 
+                if(closeBtn) closeBtn.addEventListener('click', () => store.setState({ selectedDate: null }));
 
+        
 
-        this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
+        
+
+        
+
+                const helpBtn = this.shadowRoot.getElementById('help-trigger');
+
+        
+
+                if(helpBtn) {
+
+        
+
+                    helpBtn.addEventListener('click', () => {
+
+        
+
+                        const helpModal = document.createElement('help-modal');
+
+        
+
+                        document.body.appendChild(helpModal);
+
+        
+
+                    });
+
+        
+
+                }
+
+        
+
+        
+
+        
+
+                this.shadowRoot.querySelectorAll('.commenter-name, .commenter-avatar').forEach(el => {
 
             el.addEventListener('click', () => {
 

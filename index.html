@@ -24,6 +24,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
+  <!-- PWA Settings -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#ffc1cc">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Daily Bloom">
+  <link rel="apple-touch-icon" href="/assets/logo.svg">
+
   <!-- Basic SEO -->
   <title>Daily Bloom | MBTI "J"를 위한 미니멀 일정 관리 & 블룸</title>
   <meta name="description" content="Daily Bloom은 MBTI 'J' 성향을 위한 가장 심플하고 아름다운 일정 관리 웹 서비스입니다. 캘린더, 목표 설정, 그리고 친구와의 실시간 '블룸' 응원을 통해 당신의 하루를 기록하세요." />
@@ -89,5 +97,16 @@
   </div>
   
   <script type="module" src="/main.js"></script>
+  
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then((reg) => console.log('Service Worker registered.', reg))
+          .catch((err) => console.log('Service Worker registration failed.', err));
+      });
+    }
+  </script>
 </body>
 </html>
