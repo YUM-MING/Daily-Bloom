@@ -123,6 +123,15 @@ class Store extends EventTarget {
                   this.loadBlooms();
                   this.loadNotifications(); 
 
+                  // Check for invite link
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const inviteUid = urlParams.get('invite');
+                  if (inviteUid) {
+                      // Remove param from URL to prevent loop/re-trigger
+                      window.history.replaceState({}, document.title, "/");
+                      await this.handleInvite(inviteUid);
+                  }
+
                   // Show App
                   const loader = getLoadingScreen();
                   if(loader) loader.remove(); 
@@ -226,6 +235,59 @@ class Store extends EventTarget {
   }
 
   // --- Firestore Actions ---
+
+  async handleInvite(targetUid) {
+      if (targetUid === this.state.user.uid) {
+          alert("자기 자신과는 블룸을 맺을 수 없습니다.");
+          return;
+      }
+      
+      // Check if already bloomed
+      if (this.state.user.blooms && this.state.user.blooms.includes(targetUid)) {
+          alert("이미 블룸된 친구입니다!");
+          return;
+      }
+
+      const targetDoc = await getDoc(doc(db, "users", targetUid));
+      if (!targetDoc.exists()) {
+          alert("유효하지 않은 초대 링크입니다.");
+          return;
+      }
+      
+      const targetUser = targetDoc.data();
+      
+      if (confirm(`${targetUser.nickname}님과 서로 블룸(친구)을 맺으시겠습니까?`)) {
+          await this.acceptMutualBloom(targetUid, targetUser.nickname);
+      }
+  }
+
+  async acceptMutualBloom(targetUid, targetName) {
+      try {
+          // 1. Add target to my list
+          await updateDoc(doc(db, "users", this.state.user.uid), {
+              blooms: arrayUnion(targetUid)
+          });
+
+          // 2. Add me to target's list (Mutual)
+          await updateDoc(doc(db, "users", targetUid), {
+              blooms: arrayUnion(this.state.user.uid)
+          });
+
+          // 3. Send Notifications
+          await this.sendNotification(targetUid, 'bloom', `${this.state.user.nickname}님이 초대 링크를 통해 서로 블룸을 맺었습니다! 🌸`);
+          
+          // Refresh my data
+          const userRef = doc(db, "users", this.state.user.uid);
+          const userSnap = await getDoc(userRef);
+          this.setState({ user: { ...this.state.user, ...userSnap.data() } });
+          this.loadBlooms();
+          
+          alert(`${targetName}님과 서로 블룸이 되었습니다!`);
+      } catch (e) {
+          console.error(e);
+          alert("오류가 발생했습니다: " + e.message);
+      }
+  }
 
   async loadTasks() {
       if (this.unsubTasks) {
@@ -799,6 +861,10 @@ class MyPage extends BaseComponent {
                 <div style="border-top: 1px solid var(--border-color); margin: 20px 0;"></div>
 
                 <h3>${t.addFriend}</h3>
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <button class="btn-primary" id="copy-invite-btn" style="width:100%; background: linear-gradient(45deg, #ffc1cc, #ffb7c5); border:none; padding: 12px;">🔗 내 초대 링크 복사하기 (자동 맞블룸)</button>
+                    <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">링크를 친구에게 보내면 수락 한 번으로 서로 친구가 됩니다.</div>
+                </div>
                 <div class="friend-search input-row" style="margin-bottom: 15px;">
                     <input type="email" id="friend-email" placeholder="${t.searchFriend}">
                     <button class="btn-primary" id="add-friend-btn">+</button>
@@ -853,6 +919,16 @@ class MyPage extends BaseComponent {
         this.shadowRoot.getElementById('add-friend-btn').addEventListener('click', () => {
             const email = this.shadowRoot.getElementById('friend-email').value;
             if(email) store.addBloom(email);
+        });
+
+        this.shadowRoot.getElementById('copy-invite-btn').addEventListener('click', () => {
+            const link = `${window.location.origin}?invite=${user.uid}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert("초대 링크가 복사되었습니다! 친구에게 붙여넣기(Ctrl+V)해서 보내주세요.");
+            }).catch(err => {
+                console.error('Could not copy text: ', err);
+                prompt("이 링크를 복사해서 친구에게 보내주세요:", link);
+            });
         });
 
         this.shadowRoot.querySelectorAll('.friend-card').forEach(card => {
