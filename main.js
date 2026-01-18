@@ -518,7 +518,7 @@ class Store extends EventTarget {
       this.loadBlooms();
   }
 
-  async addTask(dateStr, text) {
+  async addTask(dateStr, text, isPrivate = false) {
     if(this.state.viewingUser) {
         alert("You cannot add tasks to a friend's calendar directly. Tag them from your calendar instead!");
         return;
@@ -534,28 +534,38 @@ class Store extends EventTarget {
     // Clean text from tags
     let cleanText = text.replace(/#d\d+/, '').replace(/#w\d+/, '').trim();
 
-    const tagMatch = cleanText.match(/@(\S+)/);
-    let taggedUid = null;
-    let formattedText = cleanText;
+    // Parse multiple tags: @name1 @name2
+    const tagRegex = /@(\S+)/g;
+    const matches = [...cleanText.matchAll(tagRegex)];
+    const taggedUsers = [];
+    const taggedNames = [];
 
-    if (tagMatch) {
-        const taggedName = tagMatch[1];
-        cleanText = cleanText.replace(`@${taggedName}`, '').trim();
-        formattedText = `${cleanText} (with ${taggedName})`;
-
-        const friend = this.state.blooms.find(b => b.nickname === taggedName);
-        if (friend) {
-            if (friend.blooms && friend.blooms.includes(this.state.user.uid)) {
-                taggedUid = friend.uid;
-            } else {
-                alert(`Cannot tag @${taggedName}: You are not mutual Blooms yet! They need to Bloom you back. 🌸`);
+    if (matches.length > 0) {
+        for (const match of matches) {
+            const tagName = match[1];
+            const friend = this.state.blooms.find(b => b.nickname === tagName);
+            if (friend) {
+                if (friend.blooms && friend.blooms.includes(this.state.user.uid)) {
+                    taggedUsers.push(friend.uid);
+                    taggedNames.push(tagName);
+                } else {
+                    alert(`@${tagName}님과 태그 불가: 서로 블룸(친구) 상태여야 태그할 수 있습니다!`);
+                }
             }
         }
+        // Remove tags from text for display
+        cleanText = cleanText.replace(tagRegex, '').trim();
+    }
+    
+    // Add myself to taggedUsers for visibility check logic
+    if (taggedUsers.length > 0) {
+        taggedUsers.push(this.state.user.uid);
     }
 
     const groupId = 'group-' + Date.now();
+    const sharedId = 'share-' + Date.now(); // Link shared copies
     const baseDate = new Date(dateStr);
-    const order = Date.now(); // Consistent order for the whole group
+    const order = Date.now(); 
 
     const tasksToAdd = [];
     
@@ -565,7 +575,7 @@ class Store extends EventTarget {
             const d = new Date(baseDate);
             d.setDate(d.getDate() + i);
             const dStr = d.toISOString().split('T')[0];
-            tasksToAdd.push({ date: dStr, text: formattedText, duration, dayIndex: i });
+            tasksToAdd.push({ date: dStr, text: cleanText, duration, dayIndex: i });
         }
     } 
     // Logic for #w (Weekly repeat)
@@ -574,40 +584,56 @@ class Store extends EventTarget {
             const d = new Date(baseDate);
             d.setDate(d.getDate() + (i * 7));
             const dStr = d.toISOString().split('T')[0];
-            tasksToAdd.push({ date: dStr, text: formattedText, isWeekly: true });
+            tasksToAdd.push({ date: dStr, text: cleanText, isWeekly: true });
         }
     }
     // Normal single day
     else {
-        tasksToAdd.push({ date: dateStr, text: formattedText });
+        tasksToAdd.push({ date: dateStr, text: cleanText });
     }
 
     for (const taskData of tasksToAdd) {
-        const newTask = {
-            text: taskData.text,
+        // Base task object
+        const baseTask = {
             date: taskData.date,
             userId: this.state.user.uid,
             completed: false,
             createdAt: new Date().toISOString(),
             groupId,
-            order, // Set consistent order for alignment
+            sharedId: taggedUsers.length > 0 ? sharedId : null,
+            order,
             duration: taskData.duration || 1,
-            dayIndex: taskData.dayIndex ?? -1
+            dayIndex: taskData.dayIndex ?? -1,
+            isPrivate,
+            taggedUsers: taggedUsers.length > 0 ? taggedUsers : null
         };
 
         try {
-            await addDoc(collection(db, "tasks"), newTask);
+            // 1. Create MY task
+            let myText = taskData.text;
+            if (taggedNames.length > 0) {
+                myText += ` (with ${taggedNames.join(', ')})`;
+            }
+            await addDoc(collection(db, "tasks"), { ...baseTask, text: myText });
             
-            if (taggedUid) {
+            // 2. Create FRIEND tasks
+            for (const fUid of taggedUsers) {
+                if (fUid === this.state.user.uid) continue; // Skip myself
+                
+                // For friend, text shows "with Me, otherFriend"
+                const others = [this.state.user.nickname, ...taggedNames].filter(n => n !== this.state.blooms.find(b=>b.uid === fUid)?.nickname);
+                const friendText = `${taskData.text} (with ${others.join(', ')})`;
+
                 await addDoc(collection(db, "tasks"), {
-                    ...newTask,
-                    userId: taggedUid,
-                    text: `${cleanText} (with ${this.state.user.nickname})`
+                    ...baseTask,
+                    userId: fUid,
+                    text: friendText,
+                    isPrivate: false // Shared is always public to participants
                 });
                 
-                // Only send notification for the first day to avoid spam
+                // Notification (only on first day)
                 if (taskData.date === dateStr) {
-                    await this.sendNotification(taggedUid, 'tag', `${this.state.user.nickname}님이 일정에 회원님을 태그했습니다: ${cleanText}`, null, dateStr);
+                    await this.sendNotification(fUid, 'tag', `${this.state.user.nickname}님이 일정에 태그했습니다: ${taskData.text}`, null, dateStr);
                 }
             }
         } catch (e) {
@@ -615,7 +641,7 @@ class Store extends EventTarget {
         }
     }
 
-    if (taggedUid) alert(`Shared events with @${tagMatch[1]}!`);
+    if (taggedNames.length > 0) alert(`${taggedNames.join(', ')}님과 일정을 공유했습니다!`);
   }
 
   async reorderTasks(dateStr, reorderedTasks) {
@@ -641,7 +667,7 @@ class Store extends EventTarget {
     }
   }
 
-  async updateTask(taskId, newText) {
+  async updateTask(taskId, newText, isPrivate) {
       if(this.state.viewingUser) return;
       
       const taskRef = doc(db, "tasks", taskId);
@@ -650,14 +676,48 @@ class Store extends EventTarget {
       
       const taskData = taskSnap.data();
       
+      // Prepare updates
+      const updates = {};
+      if (newText && newText !== taskData.text) {
+          // If shared, we only update the base text part? 
+          // Complex issue: Friends have "Task (with Me)". I have "Task (with Friend)".
+          // For simplicity, we update the FULL text for now, or we'd need to store baseText separately.
+          // Let's just update the text. If they want to keep "(with ...)" they should edit carefully,
+          // OR we accept that editing overwrites the "with..." part for everyone to the new text.
+          // Decision: Update text directly. It syncs the content.
+          updates.text = newText;
+      }
+      if (typeof isPrivate !== 'undefined') updates.isPrivate = isPrivate;
+      
+      if (Object.keys(updates).length === 0) return;
+
+      // 1. Shared Tasks Sync (Highest Priority)
+      if (taskData.sharedId) {
+          const q = query(collection(db, "tasks"), where("sharedId", "==", taskData.sharedId));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach(async (d) => {
+              // We might want to preserve the "with..." suffix if possible, but for now strict sync is safer.
+              await updateDoc(doc(db, "tasks", d.id), updates);
+          });
+          return; // Done
+      }
+
+      // 2. Multi-day Sync (only if not shared, or sharedId would have covered it if we used same ID)
+      // Note: My logic uses sharedId separate from groupId. 
+      // If a task is BOTH multi-day AND shared, we need to handle both dimensions.
+      // Current structure: Each day has unique ID. They share groupId. They share sharedId?
+      // Yes, if I add #d3 @friend, all 6 tasks (3 for me, 3 for friend) should ideally share a linkage.
+      // My addTask logic assigns same groupId and same sharedId to ALL of them.
+      // So querying by sharedId is enough to catch ALL days for ALL users.
+      
       if (taskData.groupId) {
           const q = query(collection(db, "tasks"), where("groupId", "==", taskData.groupId));
           const querySnapshot = await getDocs(q);
           querySnapshot.forEach(async (d) => {
-              await updateDoc(doc(db, "tasks", d.id), { text: newText });
+              await updateDoc(doc(db, "tasks", d.id), updates);
           });
       } else {
-          await updateDoc(taskRef, { text: newText });
+          await updateDoc(taskRef, updates);
       }
   }
 
@@ -676,6 +736,17 @@ class Store extends EventTarget {
 
       if(!confirm("이 일정을 삭제할까요? (연결된 일정이 있다면 모두 삭제됩니다)")) return;
 
+      // 1. Shared Tasks Deletion
+      if (task.sharedId) {
+          const q = query(collection(db, "tasks"), where("sharedId", "==", task.sharedId));
+          const querySnapshot = await getDocs(q);
+          querySnapshot.forEach(async (d) => {
+              await deleteDoc(doc(db, "tasks", d.id));
+          });
+          return;
+      }
+
+      // 2. Multi-day Deletion
       if (task.groupId) {
           const q = query(collection(db, "tasks"), where("groupId", "==", task.groupId));
           const querySnapshot = await getDocs(q);
@@ -896,7 +967,8 @@ class HelpModal extends BaseComponent {
                         <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 친구야, 내가 써줄게! (@태그)</div>
                         <div class="guide-desc">
                             일정 입력 시 <code>@친구닉네임</code>을 입력하면 일정이 자동으로 공유됩니다.<br>
-                            <em>예: "점심 약속 @지민" → 지민이의 캘린더에도 자동 등록!</em>
+                            <em>(단, 서로 블룸(친구) 맺은 사이여야만 태그가 가능합니다!)</em><br>
+                            <em>예: "점심 약속 @지민 @철수" → 지민, 철수의 캘린더에도 자동 등록!</em>
                         </div>
                     </div>
 
@@ -1912,9 +1984,79 @@ class DailyView extends BaseComponent {
 
 
 
-        const tasks = store.state.tasks[dateStr] || [];
+                // Filter tasks for privacy
 
-        const comments = store.state.comments[commentKey] || [];
+
+
+                const rawTasks = store.state.tasks[dateStr] || [];
+
+
+
+                const tasks = rawTasks.filter(t => {
+
+
+
+                    // If viewing my own, show everything
+
+
+
+                    if (!viewingUser) return true;
+
+
+
+                    
+
+
+
+                    // If viewing friend:
+
+
+
+                    // 1. Hide private tasks
+
+
+
+                    if (t.isPrivate) return false;
+
+
+
+                    
+
+
+
+                    // 2. Hide tagged tasks if I am not in the list
+
+
+
+                    if (t.taggedUsers && !t.taggedUsers.includes(store.state.user.uid)) {
+
+
+
+                        return false;
+
+
+
+                    }
+
+
+
+                    
+
+
+
+                    return true;
+
+
+
+                });
+
+
+
+        
+
+
+
+                const comments = store.state.comments[commentKey] || [];
 
 
 
@@ -2089,11 +2231,17 @@ class DailyView extends BaseComponent {
 
                                                     <div style="display:flex; align-items:center; gap:12px; width: 100%;">
 
-                                                        <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}" ${viewingUser ? 'disabled' : ''}>
+                                                                                                                                                                        <input type="checkbox" ${t.completed ? 'checked' : ''} data-id="${t.id}" ${viewingUser ? 'disabled' : ''}>
 
-                                                        <span style="flex-grow:1" class="task-text ${t.completed ? 'completed' : ''}">${t.text}</span>
+                                                                                                                                                                        <span style="flex-grow:1" class="task-text ${t.completed ? 'completed' : ''}">
 
-                                                    </div>
+                                                                                                                                                                            ${t.text}
+
+                                                                                                                                                                            ${t.isPrivate ? '<img src="/assets/lock.svg" style="width:14px; height:14px; vertical-align:middle; margin-left:5px; opacity:0.6;">' : ''}
+
+                                                                                                                                                                        </span>
+
+                                                                                                                                                                    </div>
 
                             ${!viewingUser ? `
 
@@ -2115,19 +2263,25 @@ class DailyView extends BaseComponent {
 
                 </div>
 
-                ${!viewingUser ? `
+                                                ${!viewingUser ? `
 
-                    <div class="input-group">
+                                                    <div class="input-group">
 
-                        <input type="text" id="task-input" placeholder="${store.t.addTask}" style="flex-grow:1" autocomplete="off">
+                                                        <input type="text" id="task-input" placeholder="${store.t.addTask}" style="flex-grow:1" autocomplete="off">
 
-                        <button class="btn-primary" id="add-task-btn">+</button>
+                                                        <button id="lock-btn" class="btn-icon" style="border:1px solid var(--border-color); border-radius:8px; width:36px; height:36px; margin-right:5px; opacity:0.5; padding: 6px;">
 
-                        <div class="friend-suggestions" id="suggestions"></div>
+                                                            <img src="/assets/lock.svg" style="width:100%; height:100%;">
 
-                    </div>
+                                                        </button>
 
-                ` : ''}
+                                                        <button class="btn-primary" id="add-task-btn">+</button>
+
+                                                        <div class="friend-suggestions" id="suggestions"></div>
+
+                                                    </div>
+
+                                                ` : ''}
 
 
 
@@ -2379,69 +2533,203 @@ class DailyView extends BaseComponent {
 
 
 
-        this.shadowRoot.querySelectorAll('.edit-task-btn').forEach(btn => {
-
-            btn.addEventListener('click', () => {
-
-                const id = btn.dataset.id;
-
-                const taskItem = btn.closest('.task-item');
-
-                                const textSpan = taskItem.querySelector('.task-text');
-
-                                const originalText = textSpan.textContent; 
-
-                
-
-                                // Toggle inline edit mode
-
-                                textSpan.innerHTML = `
-
-                    <div style="display:flex; gap:5px; margin-top:5px;">
-
-                        <input type="text" class="edit-task-input" value="${originalText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
-
-                        <button class="save-task-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
-
-                        <button class="cancel-task-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
-
-                    </div>
-
-                `;
+                this.shadowRoot.querySelectorAll('.edit-task-btn').forEach(btn => {
 
 
 
-                const editInput = textSpan.querySelector('.edit-task-input');
-
-                editInput.focus();
-
-                
-
-                // Prevent drag when interacting with input
-
-                editInput.addEventListener('click', (e) => e.stopPropagation());
-
-                editInput.addEventListener('mousedown', (e) => e.stopPropagation());
+                    btn.addEventListener('click', () => {
 
 
 
-                const save = () => {
+                        const id = btn.dataset.id;
 
-                    const newText = editInput.value.trim();
 
-                    if (newText && newText !== originalText) {
 
-                        store.updateTask(id, newText);
+                        const taskItem = btn.closest('.task-item');
 
-                    } else {
 
-                        // Re-render handled by store update or manual revert
 
-                        store.loadTasks(); // simpler to just reload or let snapshot handle it, but for cancel we can just revert text
+                        const textSpan = taskItem.querySelector('.task-text');
 
-                    }
 
-                };
+
+                        const originalText = btn.dataset.text; 
+
+
+
+                        
+
+
+
+                        // Find current privacy state. We can infer it from the icon existence or data attribute.
+
+
+
+                        // Better to look up the task object from store state to be sure.
+
+
+
+                        const currentTask = store.state.tasks[dateStr].find(t => t.id === id);
+
+
+
+                        let isLocked = currentTask ? currentTask.isPrivate : false;
+
+
+
+        
+
+
+
+                        // Toggle inline edit mode
+
+
+
+                        textSpan.innerHTML = `
+
+
+
+                            <div style="display:flex; gap:5px; margin-top:5px; align-items:center;">
+
+
+
+                                <input type="text" class="edit-task-input" value="${originalText}" style="flex-grow:1; font-size:0.9rem; padding:4px 8px;">
+
+
+
+                                <button class="edit-lock-btn" style="border:1px solid ${isLocked ? 'var(--primary-color)' : 'var(--border-color)'}; border-radius:8px; width:30px; height:30px; opacity:${isLocked ? '1' : '0.5'}; padding:4px; background:${isLocked ? 'var(--surface-color)' : 'transparent'}; cursor:pointer;">
+
+
+
+                                    <img src="/assets/lock.svg" style="width:100%; height:100%;">
+
+
+
+                                </button>
+
+
+
+                                <button class="save-task-btn btn-primary" style="font-size:0.7rem; padding:4px 8px;">Save</button>
+
+
+
+                                <button class="cancel-task-btn" style="background:none; border:1px solid var(--border-color); border-radius:12px; font-size:0.7rem; padding:4px 8px; cursor:pointer; color:var(--text-color);">Cancel</button>
+
+
+
+                            </div>
+
+
+
+                        `;
+
+
+
+        
+
+
+
+                        const editInput = textSpan.querySelector('.edit-task-input');
+
+
+
+                        const lockBtn = textSpan.querySelector('.edit-lock-btn');
+
+
+
+                        editInput.focus();
+
+
+
+                        
+
+
+
+                        // Prevent drag when interacting with input
+
+
+
+                        editInput.addEventListener('click', (e) => e.stopPropagation());
+
+
+
+                        editInput.addEventListener('mousedown', (e) => e.stopPropagation());
+
+
+
+                        
+
+
+
+                        // Lock toggle logic
+
+
+
+                        lockBtn.addEventListener('click', (e) => {
+
+
+
+                            e.stopPropagation();
+
+
+
+                            isLocked = !isLocked;
+
+
+
+                            lockBtn.style.opacity = isLocked ? '1' : '0.5';
+
+
+
+                            lockBtn.style.borderColor = isLocked ? 'var(--primary-color)' : 'var(--border-color)';
+
+
+
+                            lockBtn.style.backgroundColor = isLocked ? 'var(--surface-color)' : 'transparent';
+
+
+
+                        });
+
+
+
+        
+
+
+
+                        const save = () => {
+
+
+
+                            const newText = editInput.value.trim();
+
+
+
+                            // Save if text changed OR lock status changed
+
+
+
+                            if ((newText && newText !== originalText) || isLocked !== currentTask.isPrivate) {
+
+
+
+                                store.updateTask(id, newText, isLocked);
+
+
+
+                            } else {
+
+
+
+                                store.loadTasks(); // Just revert
+
+
+
+                            }
+
+
+
+                        };
 
 
 
@@ -2501,27 +2789,135 @@ class DailyView extends BaseComponent {
 
 
 
-        const handleAddTask = () => {
-
-            if (taskInput && taskInput.value.trim()) {
-
-                store.addTask(dateStr, taskInput.value.trim());
-
-                taskInput.value = '';
-
-                if(suggestionsBox) suggestionsBox.classList.remove('active');
-
-            }
-
-        };
+                const handleAddTask = () => {
 
 
 
-        if(taskInput) {
+                    if (taskInput && taskInput.value.trim()) {
 
-            taskInput.addEventListener('keypress', (e) => { if(e.key==='Enter') handleAddTask(); });
 
-            taskInput.addEventListener('input', (e) => {
+
+                        // Determine if locked (captured from closure scope or UI check)
+
+
+
+                        const lockBtn = this.shadowRoot.getElementById('lock-btn');
+
+
+
+                        const isLocked = lockBtn && lockBtn.style.opacity === '1';
+
+
+
+                        
+
+
+
+                        store.addTask(dateStr, taskInput.value.trim(), isLocked);
+
+
+
+                        taskInput.value = '';
+
+
+
+                        
+
+
+
+                        // Reset lock
+
+
+
+                        if (lockBtn) {
+
+
+
+                            lockBtn.style.opacity = '0.5';
+
+
+
+                            lockBtn.style.borderColor = 'var(--border-color)';
+
+
+
+                        }
+
+
+
+                        
+
+
+
+                        if(suggestionsBox) suggestionsBox.classList.remove('active');
+
+
+
+                    }
+
+
+
+                };
+
+
+
+                if(taskInput) {
+
+
+
+                    const lockBtn = this.shadowRoot.getElementById('lock-btn');
+
+
+
+                    let isLocked = false;
+
+
+
+        
+
+
+
+                    if (lockBtn) {
+
+
+
+                        lockBtn.addEventListener('click', () => {
+
+
+
+                            isLocked = !isLocked;
+
+
+
+                            lockBtn.style.opacity = isLocked ? '1' : '0.5';
+
+
+
+                            lockBtn.style.borderColor = isLocked ? 'var(--primary-color)' : 'var(--border-color)';
+
+
+
+                            lockBtn.style.backgroundColor = isLocked ? 'var(--surface-color)' : 'transparent';
+
+
+
+                        });
+
+
+
+                    }
+
+
+
+        
+
+
+
+                    taskInput.addEventListener('keypress', (e) => { if(e.key==='Enter') handleAddTask(); });
+
+
+
+                    taskInput.addEventListener('input', (e) => {
 
                 const val = e.target.value;
 
