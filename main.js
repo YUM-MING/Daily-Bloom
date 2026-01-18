@@ -1302,6 +1302,9 @@ class MyPage extends BaseComponent {
                 ` : ''}
 
                 <div style="margin-bottom: 15px; text-align: center;">
+                    <button class="btn-primary" id="enable-noti-btn" style="width:100%; background: #fff; color: #333; border: 1px solid var(--border-color); padding: 12px; margin-bottom: 10px;">
+                        ${Notification.permission === 'granted' ? '🔕 알림 끄는 방법' : '🔔 푸시 알림 받기'}
+                    </button>
                     <button class="btn-primary" id="copy-invite-btn" style="width:100%; background: linear-gradient(45deg, #ffc1cc, #ffb7c5); border:none; padding: 12px;">${t.copyInvite}</button>
                     <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">${t.inviteDesc}</div>
                 </div>
@@ -1367,6 +1370,32 @@ class MyPage extends BaseComponent {
                 store.installApp();
             });
         }
+
+        this.shadowRoot.getElementById('enable-noti-btn').addEventListener('click', async () => {
+            if (!('Notification' in window)) {
+                alert("이 브라우저는 알림을 지원하지 않습니다.");
+                return;
+            }
+            
+            if (Notification.permission === 'granted') {
+                alert(
+                    "🔕 알림을 끄는 방법:\n\n" +
+                    "1. PC: 주소창 옆 자물쇠(🔒) 클릭 -> 알림 끄기\n" +
+                    "2. 갤럭시: 앱 아이콘 꾹 누르기 -> ⓘ 정보 -> 알림 -> 허용 안함\n" +
+                    "3. 아이폰: 설정 -> Daily Bloom -> 알림 -> 알림 허용 끄기"
+                );
+            } else {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    alert("알림이 설정되었습니다! 이제 친구들의 소식을 바로 받아보세요.");
+                    new Notification('Daily Bloom', { body: '알림 설정이 완료되었습니다! 🌸', icon: '/assets/logo.svg' });
+                    // Refresh UI to update button text
+                    this.render();
+                } else if (permission === 'denied') {
+                    alert("알림이 차단되어 있습니다. 브라우저 설정(주소창 옆 자물쇠)에서 알림 권한을 허용해주세요.");
+                }
+            }
+        });
 
         this.shadowRoot.getElementById('copy-invite-btn').addEventListener('click', () => {
             const link = `${window.location.origin}?invite=${user.uid}`;
