@@ -700,43 +700,68 @@ class Store extends EventTarget {
 
     const tasksToAdd = [];
     
-    // Logic for #d (Consecutive days)
-    if (duration > 1) {
-        for (let i = 0; i < duration; i++) {
-            const d = new Date(baseDate);
-            d.setDate(d.getDate() + i);
-            const dStr = d.toISOString().split('T')[0];
-            tasksToAdd.push({ date: dStr, text: cleanText, duration, dayIndex: i });
-        }
-    } 
-    // Logic for #w (Weekly repeat)
-    else if (weeks > 1) {
-        for (let i = 0; i < weeks; i++) {
-            const d = new Date(baseDate);
-            d.setDate(d.getDate() + (i * 7));
-            const dStr = d.toISOString().split('T')[0];
-            tasksToAdd.push({ date: dStr, text: cleanText, isWeekly: true });
+    // Logic for #d (Consecutive days) AND #w (Weekly repeat)
+    // Default to 1 if not specified
+    // Nested loop: Weeks -> Duration
+    
+    for (let w = 0; w < weeks; w++) {
+        // Calculate start date of this week's occurrence
+        const weekStartDate = new Date(baseDate);
+        weekStartDate.setDate(weekStartDate.getDate() + (w * 7));
+
+        for (let d = 0; d < duration; d++) {
+            const currentDate = new Date(weekStartDate);
+            currentDate.setDate(currentDate.getDate() + d);
+            const dStr = currentDate.toISOString().split('T')[0];
+            
+            // Should each week be a new group? Or one big group?
+            // Usually #w creates separate recurring instances. 
+            // #d creates a visually connected bar.
+            // If I say #d3 #w2, I expect:
+            // Week 1: 3-day bar
+            // Week 2: 3-day bar
+            // These should probably be DIFFERENT groupIds for the 'bar' effect to be distinct per week?
+            // Or same groupId? If same, clicking one completes ALL weeks? Maybe that's desired?
+            // Usually recurring events are independent instances.
+            // BUT current groupId logic ties them for completion. 
+            // If I complete Week 1's trip, Week 2's trip shouldn't auto-complete?
+            // Let's create a UNIQUE groupId per WEEK iteration to separate the bars logic.
+            // BUT wait, 'addTask' loop uses 'groupId' const.
+            // I should generate groupId inside the loop if weeks > 1.
+            
+            // Let's modify the structure of tasksToAdd to include specific groupId per set.
+            tasksToAdd.push({ 
+                date: dStr, 
+                text: cleanText, 
+                duration, 
+                dayIndex: d,
+                weekIndex: w // For grouping
+            });
         }
     }
-    // Normal single day
-    else {
-        tasksToAdd.push({ date: dateStr, text: cleanText });
-    }
+
+    // Normal single day (covered by loop w=0, d=0) if defaults are 1.
+    // ...
 
     // 4. Create Tasks in Database
     for (const taskData of tasksToAdd) {
+        // Generate unique groupId for each weekly occurrence if weeks > 1
+        // If weeks=1, duration=1, it's just one group.
+        // We can append weekIndex to groupId to make it unique per week.
+        const specificGroupId = `${groupId}-w${taskData.weekIndex}`;
+
         // Base task object for everyone
         const baseTask = {
             date: taskData.date,
             completed: false,
             createdAt: new Date().toISOString(),
-            groupId,
+            groupId: specificGroupId, // Use per-week unique group
             sharedId,
             order,
             duration: taskData.duration || 1,
             dayIndex: taskData.dayIndex ?? -1,
-            isPrivate: false, // Default to false if tagged, overridden below
-            visibility: 'public', // Default public, overridden below
+            isPrivate: false, 
+            visibility: 'public', 
             taggedUsers: allParticipants.length > 1 ? allParticipants : null
         };
 
@@ -799,11 +824,25 @@ class Store extends EventTarget {
   }
 
   async toggleTask(dateStr, taskId) {
-    if(this.state.viewingUser) return; // Prevent modifying friend's tasks
-    const task = this.state.tasks[dateStr].find(t => t.id === taskId);
+    if(this.state.viewingUser && !this.state.user) return; 
+    
+    // We must find the task to check permissions
+    // Note: this.state.tasks might be the Friend's tasks if viewingUser is set.
+    const task = this.state.tasks[dateStr]?.find(t => t.id === taskId);
+    
     if(task) {
-        if (task.userId !== this.state.user.uid) return;
-        await updateDoc(doc(db, "tasks", taskId), { completed: !task.completed });
+        const isOwner = task.userId === this.state.user.uid;
+        const isTagged = task.taggedUsers && task.taggedUsers.includes(this.state.user.uid);
+
+        if (!isOwner && !isTagged) {
+            alert("수정 권한이 없습니다.");
+            return;
+        }
+        
+        const newStatus = !task.completed;
+
+        // Toggle ONLY the specific task (day), removing group sync logic
+        await updateDoc(doc(db, "tasks", taskId), { completed: newStatus });
     }
   }
 
@@ -2047,7 +2086,10 @@ class CalendarView extends BaseComponent {
                     box-shadow: 4px 0 0 var(--bar-bg), -4px 0 0 var(--bar-bg);
                     opacity: 1 !important;
                 }
-                .task-preview.multi-day.completed { color: var(--accent-color); } 
+                .task-preview.multi-day.completed { 
+                    color: var(--accent-color); 
+                    --bar-bg: var(--completed-bar-bg);
+                } 
                 .task-preview.multi-day.completed span { text-decoration: line-through; } 
                 
                 .task-preview.multi-day.start { 
