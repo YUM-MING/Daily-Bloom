@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users: Anyone can read profiles (for search), Owner can write
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Tasks: Relaxed Read, Strict Write
+    match /tasks/{taskId} {
+      // Allow any authenticated user to read tasks (Client filters privacy)
+      allow read: if request.auth != null;
+      
+      // Only Owner can create/update/delete
+      allow write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Goals: Relaxed Read, Strict Write
+    match /goals/{goalId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+    }
+
+    // Comments: Everyone can read, Author can write
+    match /comments/{commentId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.fromUserId == request.auth.uid;
+    }
+
+    // Notifications: Recipient can read/update (mark read)
+    match /notifications/{notiId} {
+      allow read, update: if request.auth != null && resource.data.toUserId == request.auth.uid;
+      allow create: if request.auth != null; // Anyone can send noti
+    }
+  }
+}

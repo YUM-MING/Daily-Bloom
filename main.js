@@ -149,6 +149,9 @@ class Store extends EventTarget {
                   this.loadGoals();
                   this.loadBlooms();
                   this.loadNotifications(); 
+                  
+                  // Run migration for legacy tasks
+                  this.migrateLegacyTasks();
 
                   // Check for invite link
                   const urlParams = new URLSearchParams(window.location.search);
@@ -261,14 +264,17 @@ class Store extends EventTarget {
   }
 
   visitFriend(friendData) {
-      this.setState({ viewingUser: friendData, selectedDate: null });
+      const today = new Date().toISOString().split('T')[0];
+      this.setState({ viewingUser: friendData, selectedDate: today });
       this.loadTasks(); 
       this.loadGoals();
       alert(`Visiting ${friendData.nickname}'s calendar!`);
   }
 
   goHome() {
-      this.setState({ viewingUser: null, selectedDate: null, currentDate: new Date() });
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      this.setState({ viewingUser: null, selectedDate: todayStr, currentDate: today });
       this.loadTasks(); 
       this.loadGoals();
   }
@@ -280,14 +286,39 @@ class Store extends EventTarget {
           const permission = await Notification.requestPermission();
           if (permission === 'granted') {
               console.log('Notification permission granted.');
-              // In a real app with Cloud Functions, we would get the FCM token here:
-              // const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' });
-              // await updateDoc(doc(db, "users", this.state.user.uid), { fcmToken: token });
           } else {
               console.log('Unable to get permission to notify.');
           }
       } catch (e) {
           console.error('Error requesting notification permission:', e);
+      }
+  }
+
+  async migrateLegacyTasks() {
+      // Find tasks without 'visibility' field
+      // Note: Firestore doesn't support querying for missing fields easily in all modes.
+      // But we can query all my tasks and check client-side, since I am the owner (allowed by rules).
+      
+      const q = query(collection(db, "tasks"), where("userId", "==", this.state.user.uid));
+      const snapshot = await getDocs(q);
+      
+      let batchCount = 0;
+      const updates = [];
+
+      snapshot.forEach(doc => {
+          const data = doc.data();
+          if (!data.visibility) {
+              updates.push(updateDoc(doc.ref, { 
+                  visibility: 'public', 
+                  isPrivate: false 
+              }));
+              batchCount++;
+          }
+      });
+
+      if (batchCount > 0) {
+          await Promise.all(updates);
+          console.log(`Migrated ${batchCount} legacy tasks to public.`);
       }
   }
 
@@ -349,24 +380,79 @@ class Store extends EventTarget {
           this.unsubTasks();
           this.unsubTasks = null;
       }
+      if (this.unsubTasks2) {
+          this.unsubTasks2();
+          this.unsubTasks2 = null;
+      }
 
       const targetUid = this.state.viewingUser ? this.state.viewingUser.uid : (this.state.user ? this.state.user.uid : null);
       if(!targetUid) return;
 
-      const q = query(collection(db, "tasks"), where("userId", "==", targetUid));
-      this.unsubTasks = onSnapshot(q, (snapshot) => {
-          const tasks = {};
+      const processSnapshot = (tasksMap, snapshot) => {
           snapshot.forEach(doc => {
               const data = doc.data();
-              if(!tasks[data.date]) tasks[data.date] = [];
-              tasks[data.date].push({ id: doc.id, ...data });
+              if(!tasksMap[data.date]) tasksMap[data.date] = [];
+              // Prevent duplicates if queries overlap
+              if (!tasksMap[data.date].find(t => t.id === doc.id)) {
+                  tasksMap[data.date].push({ id: doc.id, ...data });
+              }
           });
-          // Sort tasks by 'order' field if exists, else by createdAt
-          for(const date in tasks) {
-              tasks[date].sort((a, b) => (a.order || 0) - (b.order || 0));
+      };
+
+      const updateState = (allTasks) => {
+          // Sort tasks
+          for(const date in allTasks) {
+              allTasks[date].sort((a, b) => (a.order || 0) - (b.order || 0));
           }
-          this.setState({ tasks });
-      });
+          this.setState({ tasks: allTasks });
+      };
+
+      if (!this.state.viewingUser) {
+          // I am owner: Load MY tasks + Tasks I am TAGGED in
+          
+          let myTasks = {};
+          let taggedTasks = {};
+
+          const mergeAndUpdate = () => {
+              const merged = JSON.parse(JSON.stringify(myTasks)); 
+              for (const date in taggedTasks) {
+                  if (!merged[date]) merged[date] = [];
+                  taggedTasks[date].forEach(t => {
+                      if (!merged[date].find(mt => mt.id === t.id)) {
+                          merged[date].push(t);
+                      }
+                  });
+              }
+              updateState(merged);
+          };
+
+          // 1. My Own Tasks
+          const qMy = query(collection(db, "tasks"), where("userId", "==", targetUid));
+          this.unsubTasks = onSnapshot(qMy, (snapshot) => {
+              myTasks = {};
+              processSnapshot(myTasks, snapshot);
+              mergeAndUpdate();
+          });
+
+          // 2. Tasks where I am TAGGED (created by others)
+          const qTagged = query(collection(db, "tasks"), where("taggedUsers", "array-contains", targetUid));
+          this.unsubTasks2 = onSnapshot(qTagged, (snapshot) => {
+              taggedTasks = {};
+              processSnapshot(taggedTasks, snapshot);
+              mergeAndUpdate();
+          });
+
+      } else {
+          // Visitor: Load all tasks for target user (Client filters privacy)
+          const q = query(collection(db, "tasks"), where("userId", "==", targetUid));
+          this.unsubTasks = onSnapshot(q, (snapshot) => {
+              const tasks = {};
+              processSnapshot(tasks, snapshot);
+              updateState(tasks);
+          }, (error) => {
+              console.error("Error loading tasks:", error);
+          });
+      }
   }
 
   async loadNotifications() {
@@ -376,9 +462,27 @@ class Store extends EventTarget {
       let isFirstLoad = true;
 
       onSnapshot(q, (snapshot) => {
-          const notifications = [];
-          snapshot.forEach(doc => notifications.push({ id: doc.id, ...doc.data() }));
+          const now = new Date();
+          const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+          
+          let notifications = [];
+          snapshot.forEach(doc => {
+              const data = doc.data();
+              const createdAt = new Date(data.createdAt);
+              
+              // Filter: Only keep if created within last 24 hours
+              if (createdAt > oneDayAgo) {
+                  notifications.push({ id: doc.id, ...data });
+              }
+          });
+          
+          // Sort newest first
           notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          
+          // Limit to max 7 items to prevent clutter
+          if (notifications.length > 7) {
+              notifications = notifications.slice(0, 7);
+          }
           
           // Trigger system notification for new items (skip initial load)
           if (!isFirstLoad && notifications.length > this.state.notifications.length) {
@@ -593,6 +697,11 @@ class Store extends EventTarget {
     }
 
     for (const taskData of tasksToAdd) {
+        // Determine Visibility
+        let visibility = 'public';
+        if (isPrivate) visibility = 'private';
+        else if (taggedUsers.length > 0) visibility = 'protected';
+
         // Base task object
         const baseTask = {
             date: taskData.date,
@@ -604,7 +713,8 @@ class Store extends EventTarget {
             order,
             duration: taskData.duration || 1,
             dayIndex: taskData.dayIndex ?? -1,
-            isPrivate,
+            isPrivate, // Keep for backward compatibility/UI logic
+            visibility, // New Security Field
             taggedUsers: taggedUsers.length > 0 ? taggedUsers : null
         };
 
@@ -628,7 +738,9 @@ class Store extends EventTarget {
                     ...baseTask,
                     userId: fUid,
                     text: friendText,
-                    isPrivate: false // Shared is always public to participants
+                    isPrivate: false, 
+                    visibility: 'protected', // Shared copies are protected
+                    taggedUsers: taggedUsers // Ensure they see me as tagged (contains everyone)
                 });
                 
                 // Notification (only on first day)
@@ -687,7 +799,13 @@ class Store extends EventTarget {
           // Decision: Update text directly. It syncs the content.
           updates.text = newText;
       }
-      if (typeof isPrivate !== 'undefined') updates.isPrivate = isPrivate;
+      if (typeof isPrivate !== 'undefined') {
+          updates.isPrivate = isPrivate;
+          // Sync visibility
+          if (isPrivate) updates.visibility = 'private';
+          else if (taskData.taggedUsers && taskData.taggedUsers.length > 0) updates.visibility = 'protected';
+          else updates.visibility = 'public';
+      }
       
       if (Object.keys(updates).length === 0) return;
 
@@ -996,8 +1114,12 @@ class HelpModal extends BaseComponent {
                         </div>
                     </div>
                     
-                    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888;">
-                        다시 보고 싶으면 우측 상단의 <strong>❤️ 하트 아이콘</strong>을 눌러주세요!
+                    <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888; display:flex; align-items:center; justify-content:center; gap:5px; flex-wrap:wrap;">
+                        다시 보고 싶으면 우측 상단의 
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC1CC" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle; display:inline-block;">
+                            <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"/>
+                        </svg>
+                        <strong>하트 버튼</strong>을 눌러주세요!
                     </div>
                 </div>
             </div>
@@ -1581,6 +1703,11 @@ class AppHeader extends BaseComponent {
                         }
                     }, 100);
                 } else if (n.type === 'comment' || n.type === 'tag') {
+                    // Close MyPage if open
+                    document.querySelector('my-page').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('hidden');
+                    document.querySelector('goal-list').classList.remove('hidden');
+
                     if (store.state.viewingUser) store.goHome(); // Return to my calendar first
                     if (n.date) {
                         store.selectDate(n.date);
@@ -1873,7 +2000,17 @@ class CalendarView extends BaseComponent {
                         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                         const isToday = today.toDateString() === new Date(year, month, d).toDateString();
                         const isSelected = selectedDate === dateStr;
-                        const dayTasks = tasks[dateStr] || [];
+                        
+                        // Filter tasks for calendar view privacy
+                        const rawTasks = tasks[dateStr] || [];
+                        const dayTasks = rawTasks.filter(t => {
+                            if (!store.state.viewingUser) return true; // My calendar: show all
+                            // Friend calendar: Hide private & non-tagged
+                            if (t.isPrivate) return false;
+                            if (t.taggedUsers && !t.taggedUsers.includes(store.state.user.uid)) return false;
+                            return true;
+                        });
+
                         const dayOfWeek = new Date(year, month, d).getDay();
                         return `
                             <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}" style="z-index: ${50 - d};">
@@ -2176,7 +2313,7 @@ class DailyView extends BaseComponent {
 
                                 /* Offset help button when close button is visible */
 
-                                #help-trigger { right: 50px; top: 16px; }
+                                #help-trigger { right: 60px; top: 18px; }
 
                             }
 
@@ -2207,15 +2344,39 @@ class DailyView extends BaseComponent {
 
                         
 
-                        <div class="daily-panel">
+                                                <div class="daily-panel">
 
-                            <span class="mobile-close" id="close-view">&times;</span>
+                        
 
-                            <button id="help-trigger" title="사용법 보기">❤️</button>
+                                                    <span class="mobile-close" id="close-view">&times;</span>
 
-                            <h2 style="margin-bottom:10px;">${dateStr}</h2>
+                        
 
-                            <div class="section-title">${taskTitle}</div>
+                                                    <button id="help-trigger" title="사용법 보기" style="background:none; border:none; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">
+
+                        
+
+                                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFC1CC" xmlns="http://www.w3.org/2000/svg">
+
+                        
+
+                                                            <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"/>
+
+                        
+
+                                                        </svg>
+
+                        
+
+                                                    </button>
+
+                        
+
+                                                    <h2 style="margin-bottom:10px;">${dateStr}</h2>
+
+                        
+
+                                                    <div class="section-title">${taskTitle}</div>
 
                                 <div id="task-list">
 
