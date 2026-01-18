@@ -852,9 +852,44 @@ class Store extends EventTarget {
       if (taskData.sharedId) {
           const q = query(collection(db, "tasks"), where("sharedId", "==", taskData.sharedId));
           const querySnapshot = await getDocs(q);
+          
+          // Get all participants' nicknames mapping (uid -> nickname)
+          // We might need to fetch user profiles if not locally available, but usually they are in 'blooms'.
+          // However, for safety, let's use the 'taggedUsers' list if available to reconstruct names.
+          // Or simpler: Extract 'with ...' from the current task being edited? No, that might be partial.
+          // Best approach: Use the 'taggedUsers' array from the task data to find names from 'this.state.blooms' + 'myself'.
+          
+          const participantUids = taskData.taggedUsers || [];
+          const participantMap = {};
+          
+          // Fill map with known names
+          if (this.state.user) participantMap[this.state.user.uid] = this.state.user.nickname;
+          this.state.blooms.forEach(b => participantMap[b.uid] = b.nickname);
+          
+          // Extract core text from the input (remove existing ' (with ...)')
+          const coreText = newText.replace(/\s*\(with\s+.*\)$/, '').trim();
+
           querySnapshot.forEach(async (d) => {
-              // We might want to preserve the "with..." suffix if possible, but for now strict sync is safer.
-              await updateDoc(doc(db, "tasks", d.id), updates);
+              const docData = d.data();
+              const ownerUid = docData.userId;
+              
+              const localUpdates = { ...updates };
+              
+              // Reconstruct text with correct suffix for THIS owner
+              if (updates.text) {
+                  const othersNames = participantUids
+                      .filter(uid => uid !== ownerUid)
+                      .map(uid => participantMap[uid] || 'Unknown') // Fallback if name not found locally
+                      .filter(name => name !== 'Unknown'); // Clean up
+                  
+                  if (othersNames.length > 0) {
+                      localUpdates.text = `${coreText} (with ${othersNames.join(', ')})`;
+                  } else {
+                      localUpdates.text = coreText;
+                  }
+              }
+
+              await updateDoc(doc(db, "tasks", d.id), localUpdates);
           });
           return; // Done
       }
@@ -2383,11 +2418,11 @@ class DailyView extends BaseComponent {
 
                                 }
 
-                                .mobile-close { display: block; top: 15px; right: 15px; }
+                                .mobile-close { display: block; top: 15px; right: 15px; line-height: 1; }
 
                                 /* Offset help button when close button is visible */
 
-                                #help-trigger { right: 55px; top: 18px; }
+                                #help-trigger { right: 55px; top: 15px; } /* Aligned top with close button */
 
                             }
 
