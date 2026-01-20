@@ -33,6 +33,41 @@ const TRANSLATIONS = {
     copyInvite: "🔗 Copy Invite Link (Auto Mutual Bloom)",
     inviteDesc: "Send this link to a friend for instant mutual blooming!",
     installApp: "⬇️ Install App",
+    // Help Modal
+    helpTitle: "Daily Bloom Guide",
+    helpTagTitle: "Share with Friends (@Tag)",
+    helpTagDesc: "Type <code>@Nickname</code> to share tasks automatically.<br><em>(Requires Mutual Bloom status!)</em><br><em>Ex: \"Lunch @Jim @Sue\" → Added to Jim & Sue's calendar!</em>",
+    helpDurationTitle: "Multi-day Events (#d)",
+    helpDurationDesc: "Add <code>#d3</code> to create a 3-day connected bar.<br><em>Ex: \"Trip to Paris #d3\" → 3-day bar starting today.</em>",
+    helpRepeatTitle: "Weekly Recurring Tasks (#w)",
+    helpRepeatDesc: "Add <code>#w4</code> to repeat for 4 weeks.<br><em>Ex: \"Weekly Meeting #w10\" → Registers for 10 weeks.</em>",
+    helpInviteTitle: "Connect Instantly",
+    helpInviteDesc: "Copy your <strong>Invite Link</strong> from My Page. Friends become <strong>Mutual Blooms</strong> instantly upon clicking.",
+    helpFooter: "To see this guide again, click the <strong style='color:var(--primary-color)'>♥ Heart</strong> button!",
+    // Alerts & Systems
+    alertSelfBloom: "You cannot Bloom yourself.",
+    alertAlreadyBloom: "You are already Blooms!",
+    alertInvalidInvite: "Invalid invite link.",
+    alertConfirmMutual: "Do you want to become Mutual Blooms with {name}?",
+    alertBloomed: "You are now Mutual Blooms with {name}!",
+    alertError: "An error occurred: ",
+    alertTagError: "Cannot tag @{name}: You must be Mutual Blooms!",
+    alertShared: "Shared with {names}!",
+    alertNoPerm: "You do not have permission.",
+    alertConfirmDelete: "Delete this task? (Linked tasks will also be deleted)",
+    alertReadOnly: "Read-only mode!",
+    alertOwnerOnly: "You can only modify your own items!",
+    alertUserNotFound: "User not found!",
+    alertConfirmDeleteBloom: "Delete this Bloom?",
+    alertCopyInvite: "Invite link copied! Paste (Ctrl+V) to send to a friend.",
+    alertNotiDisabled: "Browser notifications are not supported.",
+    alertNotiGuide: "🔕 How to disable notifications:\n\n1. PC: Click the Lock (🔒) icon next to the URL -> Toggle off Notifications\n2. Android: Long-press App Icon -> (ⓘ) Info -> Notifications -> Set to Blocked\n3. iOS: Settings -> Daily Bloom -> Notifications -> Toggle off Allow Notifications",
+    alertNotiSet: "Notifications enabled! You'll hear from your Blooms soon.",
+    alertNotiBlocked: "Notifications blocked. Please allow them in browser settings.",
+    visiting: "You are visiting {name}'s Bloom.",
+    // My Page Buttons
+    notiBtnDisable: "🔕 How to disable",
+    notiBtnEnable: "🔔 Enable Notifications",
   },
   ko: {
     appTitle: "Daily Bloom",
@@ -62,6 +97,41 @@ const TRANSLATIONS = {
     copyInvite: "🔗 내 초대 링크 복사하기 (자동 맞블룸)",
     inviteDesc: "링크를 친구에게 보내면 수락 한 번으로 서로 친구가 됩니다.",
     installApp: "⬇️ 앱 설치하고 편하게 쓰기",
+    // Help Modal
+    helpTitle: "Daily Bloom Guide",
+    helpTagTitle: "<img src='/assets/logo.svg' style='width:18px; vertical-align:middle; margin-right:5px;'> 친구야, 내가 써줄게! (@태그)",
+    helpTagDesc: "일정 입력 시 <code>@친구닉네임</code>을 입력하면 일정이 자동으로 공유됩니다.<br><em>(단, 서로 블룸(친구) 맺은 사이여야만 태그가 가능합니다!)</em><br><em>예: \"점심 약속 @지민 @철수\" → 지민, 철수의 캘린더에도 자동 등록!</em>",
+    helpDurationTitle: "<img src='/assets/logo.svg' style='width:18px; vertical-align:middle; margin-right:5px;'> 2박 3일 여행도 한 번에! (#d기간)",
+    helpDurationDesc: "일정 뒤에 <code>#d3</code>을 붙이면 3일짜리 연결된 일정이 생성됩니다.<br><em>예: \"제주도 여행 #d3\" → 오늘부터 3일간 바(Bar) 생성</em>",
+    helpRepeatTitle: "<img src='/assets/logo.svg' style='width:18px; vertical-align:middle; margin-right:5px;'> 매주 돌아오는 업무! (#w반복)",
+    helpRepeatDesc: "일정 뒤에 <code>#w4</code>를 붙이면 4주 동안 매주 같은 요일에 반복됩니다.<br><em>예: \"주간 회의 #w10\" → 10주 동안 반복 등록</em>",
+    helpInviteTitle: "<img src='/assets/logo.svg' style='width:18px; vertical-align:middle; margin-right:5px;'> 1초 만에 친구 맺기",
+    helpInviteDesc: "[마이페이지]에서 <strong>초대 링크</strong>를 복사해 친구에게 보내세요.<br>친구가 링크를 누르면 복잡한 과정 없이 바로 <strong>맞블룸(친구)</strong>이 됩니다.",
+    helpFooter: "다시 보고 싶으면 우측 상단의 <strong style='color:var(--primary-color)'>♥ 하트</strong> 버튼을 눌러주세요!",
+    // Alerts & Systems
+    alertSelfBloom: "자기 자신과는 블룸을 맺을 수 없습니다.",
+    alertAlreadyBloom: "이미 블룸된 친구입니다!",
+    alertInvalidInvite: "유효하지 않은 초대 링크입니다.",
+    alertConfirmMutual: "{name}님과 서로 블룸(친구)을 맺으시겠습니까?",
+    alertBloomed: "{name}님과 서로 블룸이 되었습니다!",
+    alertError: "오류가 발생했습니다: ",
+    alertTagError: "@{name}님과 태그 불가: 서로 블룸(친구) 상태여야 태그할 수 있습니다!",
+    alertShared: "{names}님과 일정을 공유했습니다!",
+    alertNoPerm: "수정 권한이 없습니다.",
+    alertConfirmDelete: "이 일정을 삭제할까요? (연결된 일정이 있다면 모두 삭제됩니다)",
+    alertReadOnly: "보기 전용 모드입니다!",
+    alertOwnerOnly: "본인의 항목만 수정할 수 있습니다!",
+    alertUserNotFound: "사용자를 찾을 수 없습니다!",
+    alertConfirmDeleteBloom: "이 블룸을 삭제할까요?",
+    alertCopyInvite: "초대 링크가 복사되었습니다! 친구에게 붙여넣기(Ctrl+V)해서 보내주세요.",
+    alertNotiDisabled: "이 브라우저는 알림을 지원하지 않습니다.",
+    alertNotiGuide: "🔕 알림을 끄는 방법:\n\n1. PC: 주소창 옆 자물쇠(🔒) 클릭 -> 알림 끄기\n2. 갤럭시: 앱 아이콘 꾹 누르기 -> ⓘ 정보 -> 알림 -> 허용 안함\n3. 아이폰: 설정 -> Daily Bloom -> 알림 -> 알림 허용 끄기",
+    alertNotiSet: "알림이 설정되었습니다! 이제 친구들의 소식을 바로 받아보세요.",
+    alertNotiBlocked: "알림이 차단되어 있습니다. 브라우저 설정에서 허용해주세요.",
+    visiting: "{name}님의 블룸을 방문 중입니다!",
+    // My Page Buttons
+    notiBtnDisable: "🔕 알림 끄는 방법",
+    notiBtnEnable: "🔔 푸시 알림 받기",
   }
 };
 
@@ -71,9 +141,13 @@ const TRANSLATIONS = {
 class Store extends EventTarget {
   constructor() {
     super();
+    // Detect browser language: default to 'ko' only if browser is Korean, else 'en'
+    const browserLang = navigator.language || navigator.userLanguage; 
+    const defaultLang = (browserLang && browserLang.startsWith('ko')) ? 'ko' : 'en';
+
     this.state = {
       user: null, 
-      lang: localStorage.getItem('lang') || 'ko',
+      lang: localStorage.getItem('lang') || defaultLang,
       theme: localStorage.getItem('theme') || 'light',
       currentDate: new Date(),
       selectedDate: null,
@@ -268,7 +342,7 @@ class Store extends EventTarget {
       this.setState({ viewingUser: friendData, selectedDate: today });
       this.loadTasks(); 
       this.loadGoals();
-      alert(`Visiting ${friendData.nickname}'s calendar!`);
+      alert(this.t.visiting.replace('{name}', friendData.nickname));
   }
 
   goHome() {
@@ -324,25 +398,25 @@ class Store extends EventTarget {
 
   async handleInvite(targetUid) {
       if (targetUid === this.state.user.uid) {
-          alert("자기 자신과는 블룸을 맺을 수 없습니다.");
+          alert(this.t.alertSelfBloom);
           return;
       }
       
       // Check if already bloomed
       if (this.state.user.blooms && this.state.user.blooms.includes(targetUid)) {
-          alert("이미 블룸된 친구입니다!");
+          alert(this.t.alertAlreadyBloom);
           return;
       }
 
       const targetDoc = await getDoc(doc(db, "users", targetUid));
       if (!targetDoc.exists()) {
-          alert("유효하지 않은 초대 링크입니다.");
+          alert(this.t.alertInvalidInvite);
           return;
       }
       
       const targetUser = targetDoc.data();
       
-      if (confirm(`${targetUser.nickname}님과 서로 블룸(친구)을 맺으시겠습니까?`)) {
+      if (confirm(this.t.alertConfirmMutual.replace('{name}', targetUser.nickname))) {
           await this.acceptMutualBloom(targetUid, targetUser.nickname);
       }
   }
@@ -368,10 +442,10 @@ class Store extends EventTarget {
           this.setState({ user: { ...this.state.user, ...userSnap.data() } });
           this.loadBlooms();
           
-          alert(`${targetName}님과 서로 블룸이 되었습니다!`);
+          alert(this.t.alertBloomed.replace('{name}', targetName));
       } catch (e) {
           console.error(e);
-          alert("오류가 발생했습니다: " + e.message);
+          alert(this.t.alertError + e.message);
       }
   }
 
@@ -600,7 +674,7 @@ class Store extends EventTarget {
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
-          alert("User not found!");
+          alert(this.t.alertUserNotFound);
           return;
       }
 
@@ -608,12 +682,12 @@ class Store extends EventTarget {
       const friendUid = friendDoc.id;
 
       if(friendUid === this.state.user.uid) {
-          alert("You cannot bloom yourself!");
+          alert(this.t.alertSelfBloom);
           return;
       }
 
       if (this.state.user.blooms && this.state.user.blooms.includes(friendUid)) {
-          alert("Already bloomed this user!");
+          alert(this.t.alertAlreadyBloom);
           return;
       }
 
@@ -627,13 +701,13 @@ class Store extends EventTarget {
       const userSnap = await getDoc(userRef);
       this.setState({ user: { ...this.state.user, ...userSnap.data() } });
       this.loadBlooms();
-      alert(`Bloomed ${friendDoc.data().nickname}!`);
+      alert(this.t.alertBloomed.replace('{name}', friendDoc.data().nickname));
   }
 
   async removeBloom(friendUid) {
       if(!this.state.user) return;
       
-      if(!confirm("Are you sure you want to cancel this Bloom?")) return;
+      if(!confirm(this.t.alertConfirmDeleteBloom)) return;
 
       await updateDoc(doc(db, "users", this.state.user.uid), {
           blooms: arrayRemove(friendUid)
@@ -680,7 +754,7 @@ class Store extends EventTarget {
                     friendsNames.push(tagName);
                     taggedUserUids.push(friend.uid);
                 } else {
-                    alert(`@${tagName}님과 태그 불가: 서로 블룸(친구) 상태여야 태그할 수 있습니다!`);
+                    alert(this.t.alertTagError.replace('{name}', tagName));
                 }
             }
         }
@@ -806,7 +880,7 @@ class Store extends EventTarget {
         }
     }
 
-    if (friendsNames.length > 0) alert(`${friendsNames.join(', ')}님과 일정을 공유했습니다!`);
+    if (friendsNames.length > 0) alert(this.t.alertShared.replace('{names}', friendsNames.join(', ')));
   }
 
   async reorderTasks(dateStr, reorderedTasks) {
@@ -835,7 +909,7 @@ class Store extends EventTarget {
         const isTagged = task.taggedUsers && task.taggedUsers.includes(this.state.user.uid);
 
         if (!isOwner && !isTagged) {
-            alert("수정 권한이 없습니다.");
+            alert(this.t.alertNoPerm);
             return;
         }
         
@@ -862,7 +936,7 @@ class Store extends EventTarget {
       const isTagged = taskData.taggedUsers && taskData.taggedUsers.includes(this.state.user.uid);
       
       if (!isOwner && !isTagged) {
-          alert("수정 권한이 없습니다.");
+          alert(this.t.alertNoPerm);
           return;
       }
       
@@ -967,11 +1041,11 @@ class Store extends EventTarget {
       const isTagged = task.taggedUsers && task.taggedUsers.includes(this.state.user.uid);
 
       if (!isOwner && !isTagged) {
-          alert("삭제 권한이 없습니다.");
+          alert(this.t.alertNoPerm);
           return;
       }
 
-      if(!confirm("이 일정을 삭제할까요? (연결된 일정이 있다면 모두 삭제됩니다)")) return;
+      if(!confirm(this.t.alertConfirmDelete)) return;
 
       // 1. Shared Tasks Deletion
       if (task.sharedId) {
@@ -997,7 +1071,7 @@ class Store extends EventTarget {
 
   async addGoal(monthStr, text) {
       if(this.state.viewingUser) {
-          alert("Read-only mode!");
+          alert(this.t.alertReadOnly);
           return;
       }
       if(!this.state.user) return;
@@ -1014,7 +1088,7 @@ class Store extends EventTarget {
     const goal = this.state.goals[monthStr].find(g => g.id === goalId);
     if(goal) {
         if (goal.userId !== this.state.user.uid) {
-            alert("You can only modify your own goals!");
+            alert(this.t.alertOwnerOnly);
             return;
         }
         await updateDoc(doc(db, "goals", goalId), { completed: !goal.completed });
@@ -1070,7 +1144,7 @@ class Store extends EventTarget {
       if(docSnap.exists()) {
           this.visitFriend({ uid, ...docSnap.data() });
       } else {
-          alert("User not found!");
+          alert(this.t.alertUserNotFound);
       }
   }
 
@@ -1159,7 +1233,7 @@ class Store extends EventTarget {
 
   async deleteComment(commentId) {
       if(!this.state.user) return;
-      if(!confirm("이 블룸을 삭제할까요?")) return;
+      if(!confirm(this.t.alertConfirmDeleteBloom)) return;
       await deleteDoc(doc(db, "comments", commentId));
   }
 
@@ -1174,11 +1248,11 @@ class Store extends EventTarget {
       }
       
       if (goal && goal.userId !== this.state.user.uid) {
-          alert("You can only delete your own goals!");
+          alert(this.t.alertOwnerOnly);
           return;
       }
 
-      if(!confirm("이 목표를 삭제할까요?")) return;
+      if(!confirm(this.t.alertConfirmDeleteBloom)) return;
       await deleteDoc(doc(db, "goals", goalId));
   }
 }
@@ -1204,6 +1278,7 @@ class HelpModal extends BaseComponent {
     }
 
     render() {
+        const t = store.t;
         this.shadowRoot.innerHTML = `
             <style>
                 @import url('/style.css');
@@ -1224,56 +1299,38 @@ class HelpModal extends BaseComponent {
                 h2 { color: var(--primary-color); text-align: center; margin-bottom: 20px; font-family: 'Dancing Script', cursive; }
                 .guide-item { margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
                 .guide-item:last-child { border-bottom: none; }
-                .guide-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; color: var(--primary-hover); }
+                .guide-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 5px; color: var(--primary-hover); display: flex; align-items: center; }
+                .guide-title img { margin-right: 5px; }
                 .guide-desc { font-size: 0.95rem; line-height: 1.5; color: var(--text-color); }
                 code { background: var(--bg-color); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: bold; }
             </style>
             <div class="modal-overlay" id="overlay">
                 <div class="modal-content">
                     <button class="close-btn" id="close">&times;</button>
-                    <h2>Daily Bloom Guide</h2>
+                    <h2>${t.helpTitle}</h2>
                     
                     <div class="guide-item">
-                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 친구야, 내가 써줄게! (@태그)</div>
-                        <div class="guide-desc">
-                            일정 입력 시 <code>@친구닉네임</code>을 입력하면 일정이 자동으로 공유됩니다.<br>
-                            <em>(단, 서로 블룸(친구) 맺은 사이여야만 태그가 가능합니다!)</em><br>
-                            <em>예: "점심 약속 @지민 @철수" → 지민, 철수의 캘린더에도 자동 등록!</em>
-                        </div>
+                        <div class="guide-title">${t.helpTagTitle}</div>
+                        <div class="guide-desc">${t.helpTagDesc}</div>
                     </div>
 
                     <div class="guide-item">
-                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 2박 3일 여행도 한 번에! (#d기간)</div>
-                        <div class="guide-desc">
-                            일정 뒤에 <code>#d3</code>을 붙이면 3일짜리 연결된 일정이 생성됩니다.<br>
-                            <em>예: "제주도 여행 #d3" → 오늘부터 3일간 바(Bar) 생성</em>
-                        </div>
+                        <div class="guide-title">${t.helpDurationTitle}</div>
+                        <div class="guide-desc">${t.helpDurationDesc}</div>
                     </div>
 
                     <div class="guide-item">
-                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 매주 돌아오는 업무! (#w반복)</div>
-                        <div class="guide-desc">
-                            일정 뒤에 <code>#w4</code>를 붙이면 4주 동안 매주 같은 요일에 반복됩니다.<br>
-                            <em>예: "주간 회의 #w10" → 10주 동안 반복 등록</em>
-                        </div>
+                        <div class="guide-title">${t.helpRepeatTitle}</div>
+                        <div class="guide-desc">${t.helpRepeatDesc}</div>
                     </div>
 
                     <div class="guide-item">
-                        <div class="guide-title"><img src="/assets/logo.svg" style="width:18px; vertical-align:middle; margin-right:5px;"> 1초 만에 친구 맺기</div>
-                        <div class="guide-desc">
-                            [마이페이지]에서 <strong>초대 링크</strong>를 복사해 친구에게 보내세요.<br>
-                            친구가 링크를 누르면 복잡한 과정 없이 바로 <strong>맞블룸(친구)</strong>이 됩니다.
-                        </div>
+                        <div class="guide-title">${t.helpInviteTitle}</div>
+                        <div class="guide-desc">${t.helpInviteDesc}</div>
                     </div>
                     
                     <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888; display:flex; flex-direction:column; align-items:center; gap:5px;">
-                        <span>다시 보고 싶으면 우측 상단의</span>
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFC1CC" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;">
-                                <path d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"/>
-                            </svg>
-                            <strong>하트 버튼</strong>을 눌러주세요!
-                        </div>
+                        <span>${t.helpFooter}</span>
                     </div>
                 </div>
             </div>
@@ -1375,7 +1432,7 @@ class MyPage extends BaseComponent {
 
                 <div style="margin-bottom: 15px; text-align: center;">
                     <button class="btn-primary" id="enable-noti-btn" style="width:100%; background: #fff; color: #333; border: 1px solid var(--border-color); padding: 12px; margin-bottom: 10px;">
-                        ${Notification.permission === 'granted' ? '🔕 알림 끄는 방법' : '🔔 푸시 알림 받기'}
+                        ${Notification.permission === 'granted' ? t.notiBtnDisable : t.notiBtnEnable}
                     </button>
                     <button class="btn-primary" id="copy-invite-btn" style="width:100%; background: linear-gradient(45deg, #ffc1cc, #ffb7c5); border:none; padding: 12px;">${t.copyInvite}</button>
                     <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">${t.inviteDesc}</div>
@@ -1445,26 +1502,21 @@ class MyPage extends BaseComponent {
 
         this.shadowRoot.getElementById('enable-noti-btn').addEventListener('click', async () => {
             if (!('Notification' in window)) {
-                alert("이 브라우저는 알림을 지원하지 않습니다.");
+                alert(store.t.alertNotiDisabled);
                 return;
             }
             
             if (Notification.permission === 'granted') {
-                alert(
-                    "🔕 알림을 끄는 방법:\n\n" +
-                    "1. PC: 주소창 옆 자물쇠(🔒) 클릭 -> 알림 끄기\n" +
-                    "2. 갤럭시: 앱 아이콘 꾹 누르기 -> ⓘ 정보 -> 알림 -> 허용 안함\n" +
-                    "3. 아이폰: 설정 -> Daily Bloom -> 알림 -> 알림 허용 끄기"
-                );
+                alert(store.t.alertNotiGuide);
             } else {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                    alert("알림이 설정되었습니다! 이제 친구들의 소식을 바로 받아보세요.");
-                    new Notification('Daily Bloom', { body: '알림 설정이 완료되었습니다! 🌸', icon: '/assets/logo.svg' });
+                    alert(store.t.alertNotiSet);
+                    new Notification('Daily Bloom', { body: 'Notifications enabled! 🌸', icon: '/assets/logo.svg' });
                     // Refresh UI to update button text
                     this.render();
                 } else if (permission === 'denied') {
-                    alert("알림이 차단되어 있습니다. 브라우저 설정(주소창 옆 자물쇠)에서 알림 권한을 허용해주세요.");
+                    alert(store.t.alertNotiBlocked);
                 }
             }
         });
@@ -1472,10 +1524,10 @@ class MyPage extends BaseComponent {
         this.shadowRoot.getElementById('copy-invite-btn').addEventListener('click', () => {
             const link = `${window.location.origin}?invite=${user.uid}`;
             navigator.clipboard.writeText(link).then(() => {
-                alert("초대 링크가 복사되었습니다! 친구에게 붙여넣기(Ctrl+V)해서 보내주세요.");
+                alert(store.t.alertCopyInvite);
             }).catch(err => {
                 console.error('Could not copy text: ', err);
-                prompt("이 링크를 복사해서 친구에게 보내주세요:", link);
+                prompt(store.t.copyInvite, link);
             });
         });
 

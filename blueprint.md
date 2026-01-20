@@ -37,3 +37,16 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
 - **Fuzzy Search:** Implemented a scoring algorithm based on character order and string proximity.
 - **Visual Continuity:** CSS trickery with negative margins and group ordering to ensure multi-day task bars appear seamless across the calendar grid.
 - **Real-time UI:** Leveraged `onSnapshot` from Firestore for zero-refresh updates on tasks, comments, and notifications.
+
+## Current Plan: Global Expansion & SEO (2026-01-20)
+- [ ] **SEO Overhaul**:
+    - Update `index.html` meta tags to be bilingual or English-friendly.
+    - Expand keywords to include global search terms (Planner, Schedule, MBTI J, etc.).
+    - Enhance Open Graph and Twitter Card descriptions.
+- [ ] **Internationalization (i18n) Fixes**:
+    - **Help Modal**: Move hardcoded Korean text to the `TRANSLATIONS` object.
+    - **Alerts/Dialogs**: Replace hardcoded alert strings in `main.js` with dynamic translations.
+    - **UI Consistency**: Ensure all buttons and placeholders update immediately upon language toggle.
+- [ ] **Feature Fixes**:
+    - **Help Button**: Add the missing "Heart" button in the header to re-open the Help modal as described in the guide.
+    - **English Naturalization**: Review and polish English text to sound more native ("Think like a foreigner").
