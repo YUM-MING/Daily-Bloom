@@ -68,6 +68,12 @@ const TRANSLATIONS = {
     // My Page Buttons
     notiBtnDisable: "🔕 How to disable",
     notiBtnEnable: "🔔 Enable Notifications",
+    // Notifications (Dynamic)
+    notiMutualAccepted: "{name} accepted your invite! 🌸",
+    notiBloomAdded: "{name} Bloomed you! Bloom back? 🌸",
+    notiTag: "{name} tagged you: {text}",
+    notiComment: "{name} left a bloom on {date}!",
+    notiReply: "{name} replied: {text}",
   },
   ko: {
     appTitle: "Daily Bloom",
@@ -132,6 +138,12 @@ const TRANSLATIONS = {
     // My Page Buttons
     notiBtnDisable: "🔕 알림 끄는 방법",
     notiBtnEnable: "🔔 푸시 알림 받기",
+    // Notifications (Dynamic)
+    notiMutualAccepted: "{name}님이 초대 링크를 통해 서로 블룸을 맺었습니다! 🌸",
+    notiBloomAdded: "{name}님이 회원님을 블룸(Bloom)했습니다! 맞블룸하여 친구가 되어보세요. 🌸",
+    notiTag: "{name}님이 일정에 태그했습니다: {text}",
+    notiComment: "{name}님이 회원님의 달력({date})에 블룸을 남겼습니다!",
+    notiReply: "{name}님이 대화에 답장을 남겼습니다: {text}",
   }
 };
 
@@ -434,7 +446,7 @@ class Store extends EventTarget {
           });
 
           // 3. Send Notifications
-          await this.sendNotification(targetUid, 'bloom', `${this.state.user.nickname}님이 초대 링크를 통해 서로 블룸을 맺었습니다! 🌸`);
+          await this.sendNotification(targetUid, 'bloom', `${this.state.user.nickname}님이 초대 링크를 통해 서로 블룸을 맺었습니다! 🌸`, null, null, 'notiMutualAccepted', { name: this.state.user.nickname });
           
           // Refresh my data
           const userRef = doc(db, "users", this.state.user.uid);
@@ -601,13 +613,15 @@ class Store extends EventTarget {
       await updateDoc(doc(db, "notifications", id), { read: true });
   }
 
-  async sendNotification(toUserId, type, message, senderEmail = null, date = null) {
+  async sendNotification(toUserId, type, message, senderEmail = null, date = null, messageKey = null, messageParams = null) {
       await addDoc(collection(db, "notifications"), {
           toUserId,
           fromUser: this.state.user.nickname,
           senderEmail: senderEmail || this.state.user.email, // Add email for bloom back
           type, // 'bloom', 'comment', 'tag'
           message,
+          messageKey,
+          messageParams,
           date, // Navigation target
           read: false,
           createdAt: new Date().toISOString()
@@ -695,7 +709,7 @@ class Store extends EventTarget {
           blooms: arrayUnion(friendUid)
       });
       
-      await this.sendNotification(friendUid, 'bloom', `${this.state.user.nickname}님이 회원님을 블룸(Bloom)했습니다! 맞블룸하여 친구가 되어보세요. 🌸`);
+      await this.sendNotification(friendUid, 'bloom', `${this.state.user.nickname}님이 회원님을 블룸(Bloom)했습니다! 맞블룸하여 친구가 되어보세요. 🌸`, null, null, 'notiBloomAdded', { name: this.state.user.nickname });
 
       const userRef = doc(db, "users", this.state.user.uid);
       const userSnap = await getDoc(userRef);
@@ -872,7 +886,7 @@ class Store extends EventTarget {
                 
                 // Notification (only on first day of the sequence to avoid spam)
                 if (taskData.date === dateStr) {
-                    await this.sendNotification(friend.uid, 'tag', `${this.state.user.nickname}님이 일정에 태그했습니다: ${taskData.text}`, null, dateStr);
+                    await this.sendNotification(friend.uid, 'tag', `${this.state.user.nickname}님이 일정에 태그했습니다: ${taskData.text}`, null, dateStr, 'notiTag', { name: this.state.user.nickname, text: taskData.text });
                 }
             }
         } catch (e) {
@@ -1216,7 +1230,10 @@ class Store extends EventTarget {
                 ? `${this.state.user.nickname}님이 대화에 답장을 남겼습니다: ${text}`
                 : `${this.state.user.nickname}님이 회원님의 달력(${dateStr})에 블룸을 남겼습니다!`;
               
-              notifyPromises.push(this.sendNotification(uid, 'comment', msg, null, dateStr));
+              const key = parentId ? 'notiReply' : 'notiComment';
+              const params = { name: this.state.user.nickname, text: text, date: dateStr };
+
+              notifyPromises.push(this.sendNotification(uid, 'comment', msg, null, dateStr, key, params));
           }
       });
       
@@ -1756,16 +1773,27 @@ class AppHeader extends BaseComponent {
                     </button>
                     <div class="noti-dropdown" id="noti-dropdown">
                         ${store.state.notifications.length === 0 ? '<div style="padding:20px; text-align:center; opacity:0.6;">No notifications</div>' : ''}
-                        ${store.state.notifications.map(n => `
+                        ${store.state.notifications.map(n => {
+                            let displayText = n.message;
+                            if (n.messageKey && strings[n.messageKey]) {
+                                displayText = strings[n.messageKey];
+                                if (n.messageParams) {
+                                    for (const key in n.messageParams) {
+                                        displayText = displayText.replace(`{${key}}`, n.messageParams[key]);
+                                    }
+                                }
+                            }
+                            return `
                             <div class="noti-item ${n.read ? 'read' : ''}" data-id="${n.id}">
                                 <div style="flex-grow:1;">
                                     <strong>${n.type === 'bloom' ? '🌸 Bloom' : n.type === 'tag' ? '📌 Tag' : '💬 Bloom'}</strong><br>
-                                    ${n.message}
+                                    ${displayText}
                                     ${n.date ? `<div style="font-size:0.7rem; color:var(--primary-color); margin-top:4px;">Date: ${n.date}</div>` : ''}
                                 </div>
                                 <button class="noti-delete-btn" data-id="${n.id}">&times;</button>
                             </div>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                 </div>
                 <div class="profile-trigger" id="mypage-btn">
