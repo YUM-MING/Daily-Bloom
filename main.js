@@ -74,6 +74,12 @@ const TRANSLATIONS = {
     notiTag: "{name} tagged you: {text}",
     notiComment: "{name} left a bloom on {date}!",
     notiReply: "{name} replied: {text}",
+    loginDescTitle: "Plan your day beautifully.",
+    loginDescBody: "Daily Bloom is a minimalist planner designed for MBTI 'J' types and anyone who loves structure. Manage your schedule, track goals, and share blooms with friends.",
+    loginFeature1: "Smart task entry (#d for duration, #w for weekly)",
+    loginFeature2: "Share tasks with friends (@tag)",
+    loginFeature3: "Monthly goal tracking",
+    loginFeature4: "Real-time social motivation (Bloom)",
   },
   ko: {
     appTitle: "Daily Bloom",
@@ -144,6 +150,12 @@ const TRANSLATIONS = {
     notiTag: "{name}님이 일정에 태그했습니다: {text}",
     notiComment: "{name}님이 회원님의 달력({date})에 블룸을 남겼습니다!",
     notiReply: "{name}님이 대화에 답장을 남겼습니다: {text}",
+    loginDescTitle: "당신의 하루를 아름답게 피워보세요.",
+    loginDescBody: "Daily Bloom은 MBTI 'J' 성향을 가진 분들을 위한 미니멀리스트 플래너입니다. 체계적인 일정 관리와 목표 달성을 도와드립니다.",
+    loginFeature1: "스마트 일정 입력 (#d 기간, #w 주간 반복)",
+    loginFeature2: "친구와 일정 공유 (@태그)",
+    loginFeature3: "이달의 목표 관리",
+    loginFeature4: "실시간 소셜 인터랙션 (블룸 응원)",
   }
 };
 
@@ -182,6 +194,16 @@ class Store extends EventTarget {
         // Dispatch event to let components know install is available
         this.dispatchEvent(new CustomEvent('install-available'));
     });
+  }
+
+  loadAdSense() {
+    if (window.adsbygoogle_loaded) return;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3685380356679104";
+    script.crossOrigin = "anonymous";
+    document.head.appendChild(script);
+    window.adsbygoogle_loaded = true;
   }
 
   async installApp() {
@@ -277,6 +299,9 @@ class Store extends EventTarget {
                       appView.style.visibility = 'visible'; 
                   }
                   console.log("App view forced shown and loading screen removed.");
+
+                  // Load AdSense only after content is ready
+                  this.loadAdSense();
               } catch (e) {
                   console.error("Error fetching/creating user profile:", e);
                   const loader = getLoadingScreen();
@@ -302,6 +327,9 @@ class Store extends EventTarget {
                   appView.classList.add('hidden');
                   appView.style.display = 'none';
               }
+              
+              // Load AdSense after showing login content
+              this.loadAdSense();
           }
       });
   }
@@ -1361,33 +1389,82 @@ class HelpModal extends BaseComponent {
 }
 customElements.define('help-modal', HelpModal);
 
-class AppLogin extends HTMLElement {
-  constructor() { super(); this.attachShadow({mode:'open'}); }
-  connectedCallback() { this.render(); }
-  
+class AppLogin extends BaseComponent {
   render() {
+      const t = store.t || TRANSLATIONS.ko;
+      const langBtnText = store.state.lang === 'en' ? '한국어' : 'English';
+      
       this.shadowRoot.innerHTML = `
         <style>
             @import url('/style.css'); 
-            :host{display:block;}
+            :host{display:block; position: relative;}
             h1 { font-family: 'Dancing Script', cursive; font-size: 3.5rem; color: var(--primary-color); margin-bottom: 10px; }
-            p { font-family: 'Gowun Dodum', sans-serif; color: var(--text-color); margin-bottom: 30px; font-size: 1.1rem; }
+            p.tagline { font-family: 'Gowun Dodum', sans-serif; color: var(--text-color); margin-bottom: 30px; font-size: 1.1rem; }
             .btn-primary { font-family: 'Gowun Dodum', sans-serif; font-size: 1.1rem; padding: 12px 32px; border-radius: 30px; }
+            .intro-content { max-width: 450px; margin: 0 auto 40px; text-align: left; font-size: 1rem; line-height: 1.6; color: var(--text-color); background: var(--surface-color); padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+            .intro-content h3 { color: var(--primary-color); margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; }
+            .intro-content p { margin-bottom: 15px; opacity: 0.8; }
+            .intro-content ul { padding-left: 20px; margin: 0; opacity: 0.8; }
+            .intro-content li { margin-bottom: 8px; }
+            
+            .lang-toggle {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: var(--surface-color);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                padding: 6px 16px;
+                font-size: 0.9rem;
+                cursor: pointer;
+                color: var(--text-color);
+                font-family: 'Gowun Dodum', sans-serif;
+                transition: all 0.2s;
+            }
+            .lang-toggle:hover {
+                border-color: var(--primary-color);
+                color: var(--primary-color);
+            }
+            
+            @media (max-width: 480px) {
+                h1 { font-size: 2.5rem; }
+                .lang-toggle { top: 15px; right: 15px; font-size: 0.8rem; padding: 4px 12px; }
+            }
         </style>
-        <div class="login-container" style="text-align:center;">
+        
+        <button class="lang-toggle" id="lang-btn">${langBtnText}</button>
+
+        <div class="login-container" style="text-align:center; padding: 60px 20px 40px;">
              <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:120px; margin-bottom:10px;">
              <h1>Daily Bloom</h1>
-             <p>당신의 하루를 아름답게 피워보세요.</p>
+             <p class="tagline">${t.loginDescTitle}</p>
+             
+             <div class="intro-content">
+                <h3>About Daily Bloom</h3>
+                <p>${t.loginDescBody}</p>
+                <ul>
+                    <li>${t.loginFeature1}</li>
+                    <li>${t.loginFeature2}</li>
+                    <li>${t.loginFeature3}</li>
+                    <li>${t.loginFeature4}</li>
+                </ul>
+             </div>
+
              <button class="btn-primary" id="google-btn">
-                ${TRANSLATIONS.ko.login}
+                ${t.login}
              </button>
         </div>
       `;
+      
       this.shadowRoot.getElementById('google-btn').addEventListener('click', () => {
           signInWithPopup(auth, provider).catch((error) => {
               console.error("Login Error:", error);
               alert("Login failed: " + error.message);
           });
+      });
+      
+      this.shadowRoot.getElementById('lang-btn').addEventListener('click', () => {
+          store.toggleLang();
       });
   }
 }
@@ -2057,7 +2134,7 @@ class GoalList extends BaseComponent {
             <div class="card goal-container">
                 <h3>${title}</h3>
                 <div class="list">
-                    ${currentGoals.length === 0 ? `<p>${t.noGoals}</p>` : ''}
+                    ${currentGoals.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem;">${t.noGoals} ${lang === 'ko' ? '목표를 추가하여 한 달을 계획해보세요!' : 'Add a goal to plan your month!'}</p>` : ''}
                     ${currentGoals.map(g => `
                         <div class="goal-item">
                             ${viewingUser ? 
@@ -2673,7 +2750,7 @@ class DailyView extends BaseComponent {
 
                                 <div id="task-list">
 
-                                    ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem; text-align: center; padding: 20px 0;">${store.t.noTasks}</p>` : ''}
+                                    ${tasks.length === 0 ? `<p style="opacity:0.6; font-size:0.9rem; text-align: center; padding: 20px 0;">${store.t.noTasks}<br><span style="font-size:0.8rem;">${lang === 'ko' ? '새로운 일정을 추가하고 하루를 채워보세요.' : 'Add a new task and fill your day.'}</span></p>` : ''}
 
                                     ${tasks.map((t, index) => {
 

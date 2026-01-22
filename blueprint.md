@@ -43,10 +43,15 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
     - Update `index.html` meta tags to be bilingual or English-friendly.
     - Expand keywords to include global search terms (Planner, Schedule, MBTI J, etc.).
     - Enhance Open Graph and Twitter Card descriptions.
-- [ ] **Internationalization (i18n) Fixes**:
+- [x] **Internationalization (i18n) Fixes**:
     - **Help Modal**: Move hardcoded Korean text to the `TRANSLATIONS` object.
     - **Alerts/Dialogs**: Replace hardcoded alert strings in `main.js` with dynamic translations.
     - **UI Consistency**: Ensure all buttons and placeholders update immediately upon language toggle.
+    - **Notifications**: Implemented dynamic translation for new notifications (Tag, Bloom, Comment) using `messageKey` storage.
+- [x] **AdSense Policy Compliance**:
+    - **Delayed Script Loading**: AdSense script now loads dynamically only after the main app content or enhanced login content is visible. This prevents ads from appearing on the "Loading..." screen.
+    - **Enhanced Login Content**: Added a detailed "About Daily Bloom" section to the login page with feature descriptions in English and Korean to satisfy "publisher content" requirements.
+    - **Empty State Improvements**: Added descriptive and encouraging text to empty task and goal lists to maintain content value.
 - [ ] **Feature Fixes**:
     - **Help Button**: Add the missing "Heart" button in the header to re-open the Help modal as described in the guide.
     - **English Naturalization**: Review and polish English text to sound more native ("Think like a foreigner").
