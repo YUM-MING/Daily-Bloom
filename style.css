@@ -212,9 +212,7 @@ input[type="checkbox"]:hover {
 
 /* Login View */
 app-login {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block; /* Changed from flex to block for scrolling content */
   min-height: 100vh;
   background-color: var(--bg-color);
 }

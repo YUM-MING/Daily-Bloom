@@ -1390,83 +1390,312 @@ class HelpModal extends BaseComponent {
 customElements.define('help-modal', HelpModal);
 
 class AppLogin extends BaseComponent {
-  render() {
-      const t = store.t || TRANSLATIONS.ko;
-      const langBtnText = store.state.lang === 'en' ? '한국어' : 'English';
-      
-      this.shadowRoot.innerHTML = `
-        <style>
-            @import url('/style.css'); 
-            :host{display:block; position: relative;}
-            h1 { font-family: 'Dancing Script', cursive; font-size: 3.5rem; color: var(--primary-color); margin-bottom: 10px; }
-            p.tagline { font-family: 'Gowun Dodum', sans-serif; color: var(--text-color); margin-bottom: 30px; font-size: 1.1rem; }
-            .btn-primary { font-family: 'Gowun Dodum', sans-serif; font-size: 1.1rem; padding: 12px 32px; border-radius: 30px; }
-            .intro-content { max-width: 450px; margin: 0 auto 40px; text-align: left; font-size: 1rem; line-height: 1.6; color: var(--text-color); background: var(--surface-color); padding: 25px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-            .intro-content h3 { color: var(--primary-color); margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; }
-            .intro-content p { margin-bottom: 15px; opacity: 0.8; }
-            .intro-content ul { padding-left: 20px; margin: 0; opacity: 0.8; }
-            .intro-content li { margin-bottom: 8px; }
-            
-            .lang-toggle {
-                position: absolute;
-                top: 20px;
-                right: 20px;
-                background: var(--surface-color);
-                border: 1px solid var(--border-color);
-                border-radius: 20px;
-                padding: 6px 16px;
-                font-size: 0.9rem;
-                cursor: pointer;
-                color: var(--text-color);
-                font-family: 'Gowun Dodum', sans-serif;
-                transition: all 0.2s;
-            }
-            .lang-toggle:hover {
-                border-color: var(--primary-color);
-                color: var(--primary-color);
-            }
-            
-            @media (max-width: 480px) {
-                h1 { font-size: 2.5rem; }
-                .lang-toggle { top: 15px; right: 15px; font-size: 0.8rem; padding: 4px 12px; }
-            }
-        </style>
+    render() {
+        const t = store.t || TRANSLATIONS.ko;
+        const langBtnText = store.state.lang === 'en' ? '한국어' : 'English';
+        const isKo = store.state.lang !== 'en';
         
-        <button class="lang-toggle" id="lang-btn">${langBtnText}</button>
+        this.shadowRoot.innerHTML = `
+            <style>
+                @import url('/style.css'); 
+                :host { 
+                    display: block; 
+                    background: var(--bg-color); 
+                    width: 100%;
+                    overflow-x: hidden;
+                }
+                
+                /* Utils */
+                .text-highlight { color: var(--primary-color); font-weight: bold; }
+                .font-j { font-family: 'Quicksand', sans-serif; font-weight: 700; color: var(--primary-color); }
+                
+                /* Icon Styling */
+                .feature-icon {
+                    width: 40px;
+                    height: 40px;
+                    color: var(--primary-color);
+                    margin-bottom: -8px;
+                    margin-right: 12px;
+                    vertical-align: middle;
+                }
 
-        <div class="login-container" style="text-align:center; padding: 60px 20px 40px;">
-             <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:120px; margin-bottom:10px;">
-             <h1>Daily Bloom</h1>
-             <p class="tagline">${t.loginDescTitle}</p>
-             
-             <div class="intro-content">
-                <h3>About Daily Bloom</h3>
-                <p>${t.loginDescBody}</p>
-                <ul>
-                    <li>${t.loginFeature1}</li>
-                    <li>${t.loginFeature2}</li>
-                    <li>${t.loginFeature3}</li>
-                    <li>${t.loginFeature4}</li>
-                </ul>
-             </div>
+                /* Container for the whole page content */
+                .landing-page-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    width: 100%;
+                }
 
-             <button class="btn-primary" id="google-btn">
-                ${t.login}
-             </button>
-        </div>
-      `;
-      
-      this.shadowRoot.getElementById('google-btn').addEventListener('click', () => {
-          signInWithPopup(auth, provider).catch((error) => {
-              console.error("Login Error:", error);
-              alert("Login failed: " + error.message);
-          });
-      });
-      
-      this.shadowRoot.getElementById('lang-btn').addEventListener('click', () => {
-          store.toggleLang();
-      });
-  }
+                .section { 
+                    display: block; 
+                    padding: 100px 20px; 
+                    width: 100%;
+                    margin: 0 auto; 
+                    text-align: center; 
+                    box-sizing: border-box;
+                }
+                .section:nth-child(even) { background: var(--surface-color); }
+                
+                /* Hero Section */
+                .hero { 
+                    min-height: 95vh; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    justify-content: center;
+                    padding: 60px 20px;
+                    position: relative;
+                }
+                h1 { font-family: 'Dancing Script', cursive; font-size: 5rem; color: var(--primary-color); margin-bottom: 20px; line-height: 1.1; }
+                p.tagline { font-family: 'Gowun Dodum', sans-serif; color: var(--text-color); margin-bottom: 40px; font-size: 1.5rem; opacity: 0.9; max-width: 600px; }
+                
+                /* Custom Scroll Arrow */
+                .scroll-indicator {
+                    position: absolute;
+                    bottom: 40px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 10px;
+                    color: var(--primary-color);
+                    opacity: 0.7;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                }
+                .scroll-indicator:hover { opacity: 1; transform: translateY(5px); }
+                .scroll-arrow {
+                    animation: bounce-arrow 2s infinite;
+                }
+                @keyframes bounce-arrow {
+                    0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+                    40% {transform: translateY(-10px);}
+                    60% {transform: translateY(-5px);}
+                }
+
+                /* Feature Grid */
+                .feature-container { width: 100%; max-width: 1000px; margin: 0 auto; }
+                
+                /* Vertical Stack for Calendar (Full Width Image) */
+                .feature-stack {
+                    margin-bottom: 120px;
+                    text-align: center;
+                }
+                .feature-stack .feature-img-wrapper {
+                    max-width: 100%;
+                    margin-bottom: 40px;
+                }
+                .feature-stack h3 { font-size: 2.2rem; color: var(--text-color); margin-bottom: 20px; font-family: 'Quicksand', sans-serif; display: flex; align-items: center; justify-content: center; }
+                .feature-stack p { font-size: 1.25rem; line-height: 1.8; opacity: 0.9; margin-bottom: 20px; }
+                
+                .feature-bullets {
+                    display: inline-block;
+                    text-align: left;
+                    margin-top: 15px;
+                    font-size: 1.1rem;
+                    opacity: 0.8;
+                    line-height: 2;
+                    padding-left: 25px;
+                    border-left: 3px solid var(--primary-color);
+                }
+
+                /* Side by Side for others */
+                .feature-row { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 80px; 
+                    margin-bottom: 120px; 
+                    text-align: left;
+                }
+                .feature-row:last-child { margin-bottom: 0; }
+                .feature-row.reverse { flex-direction: row-reverse; }
+                
+                .feature-text { flex: 1; min-width: 300px; }
+                .feature-text h3 { font-size: 2.2rem; color: var(--text-color); margin-bottom: 20px; font-family: 'Quicksand', sans-serif; display: flex; align-items: center; }
+                .feature-text p { font-size: 1.2rem; line-height: 1.8; opacity: 0.8; margin-bottom: 20px; }
+                
+                .feature-img-wrapper {
+                    flex: 1.2;
+                    border-radius: 20px;
+                    overflow: hidden;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    border: 1px solid var(--border-color);
+                    background: white;
+                    transition: transform 0.3s;
+                    min-width: 300px;
+                    max-height: 550px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .feature-img-wrapper:hover { transform: translateY(-5px); }
+                .feature-img-wrapper img { 
+                    max-width: 100%; 
+                    max-height: 100%; 
+                    width: auto;
+                    height: auto;
+                    display: block; 
+                    object-fit: contain; 
+                }
+                
+                @media (max-width: 900px) {
+                    .feature-row, .feature-row.reverse { flex-direction: column; text-align: center; gap: 40px; margin-bottom: 80px; }
+                    .feature-text { min-width: auto; }
+                    .feature-text h3 { justify-content: center; }
+                    .feature-img-wrapper { min-width: auto; width: 100%; }
+                    h1 { font-size: 3.5rem; }
+                    .hero { min-height: auto; padding: 120px 20px; }
+                    .feature-bullets { border-left: none; border-top: 2px solid var(--primary-color); padding-left: 0; padding-top: 15px; text-align: center; }
+                }
+
+                /* Login Button Area */
+                .login-area { margin-top: 20px; margin-bottom: 20px; }
+                .btn-large { 
+                    font-family: 'Gowun Dodum', sans-serif; font-size: 1.3rem; 
+                    padding: 16px 48px; border-radius: 50px; 
+                    background: var(--primary-color); color: #fff; 
+                    box-shadow: 0 4px 15px rgba(255, 193, 204, 0.4);
+                    transition: transform 0.2s;
+                }
+                .btn-large:hover { transform: translateY(-2px); background: var(--primary-hover); }
+
+                /* Footer */
+                footer { padding: 60px 20px; text-align: center; border-top: 1px solid var(--border-color); font-size: 0.9rem; opacity: 0.7; background: var(--surface-color); width: 100%; }
+                footer a { color: var(--text-color); text-decoration: none; margin: 0 10px; font-weight: bold; }
+                
+                .lang-toggle { position: absolute; top: 20px; right: 20px; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 16px; cursor: pointer; z-index: 10; }
+            </style>
+            
+            <button class="lang-toggle" id="lang-btn">${langBtnText}</button>
+
+            <div class="landing-page-wrapper">
+                <!-- 1. Hero Section -->
+                <div class="hero">
+                     <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:120px; margin-bottom:20px; animation: pulse 3s infinite;">
+                     <h1>Daily Bloom</h1>
+                     <p class="tagline">${isKo ? '당신의 하루를 아름답게 피워보세요.' : 'Bloom Your Day, Beautifully.'}</p>
+                     
+                     <div class="login-area">
+                        <button class="btn-large" id="google-btn">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px; vertical-align:middle; margin-right:8px; background:white; border-radius:50%; padding:2px;">
+                            ${t.login}
+                        </button>
+                     </div>
+                     
+                     <div class="scroll-indicator" id="scroll-btn">
+                        <span style="font-size: 0.9rem;">${isKo ? '아래로 스크롤하여 둘러보기' : 'Scroll down to explore'}</span>
+                        <svg class="scroll-arrow" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                        </svg>
+                     </div>
+                </div>
+        
+                <!-- 2. Intro Section -->
+                <div class="section" id="first-section">
+                    <h2 style="font-family:'Dancing Script'; color:var(--primary-color); font-size:3.5rem; margin-bottom:20px;">
+                        ${isKo ? '계획적인 <span class="font-j">J</span>형을 위한 감성 플래너' : 'For the Structured <span class="font-j">J</span>-Type Mind'}
+                    </h2>
+                    <p style="max-width:750px; margin:0 auto; font-size:1.35rem; line-height:1.8;">
+                        ${isKo 
+                            ? '복잡한 건 싫지만 체계적인 건 좋아하는 당신.<br>Daily Bloom은 <strong>미니멀한 디자인</strong>과 <strong>강력한 스케줄링</strong> 기능을 결합했습니다.<br>친구들과 서로의 하루를 응원하며 목표를 달성해보세요.' 
+                            : 'Minimalist design meets powerful scheduling.<br>Daily Bloom is crafted for those who love structure without the clutter.<br>Share your journey, motivate friends, and achieve your goals together.'}
+                    </p>
+                </div>
+        
+                <!-- 3. Features -->
+                <div class="section" style="background: var(--bg-color);">
+                    <div class="feature-container">
+                        
+                        <!-- Feature 1: Smart Scheduling -->
+                        <div class="feature-stack">
+                            <div class="feature-img-wrapper">
+                                <img src="/assets/CalendarViewScreenshot.png" alt="Smart Scheduling Screenshot">
+                            </div>
+                            <div class="feature-text-center">
+                                <h3>
+                                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                    ${isKo ? '스마트한 일정 입력' : 'Smart Scheduling'}
+                                </h3>
+                                <p>${isKo ? '텍스트만 입력하세요. 나머지는 알아서 할게요.' : 'Just type. We handle the rest.'}</p>
+                                <div class="feature-bullets">
+                                    <div>• <strong>#d3</strong> : ${isKo ? '3일짜리 여행 일정 자동 생성' : 'Create a 3-day trip bar automatically.'}</div>
+                                    <div>• <strong>#w4</strong> : ${isKo ? '4주 동안 반복되는 주간 회의 등록' : 'Repeat weekly meetings for 4 weeks.'}</div>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <!-- Feature 2: Social Bloom -->
+                        <div class="feature-row reverse">
+                            <div class="feature-text">
+                                <h3>
+                                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+                                    </svg>
+                                    ${isKo ? '서로의 하루를 응원해요' : 'Bloom Together'}
+                                </h3>
+                                <p>
+                                    ${isKo 
+                                        ? '혼자 하면 지치지만, 함께하면 즐겁습니다.<br>친구의 캘린더에 방문해 <strong>Bloom(응원)</strong>을 남겨주세요.<br><strong>@친구태그</strong>로 약속을 한 번에 공유할 수도 있습니다.' 
+                                        : 'Planning is better with friends.<br>Visit friends\' calendars and leave a <strong>Bloom</strong>.<br>Share events instantly with <strong>@Tag</strong>.'}
+                                </p>
+                            </div>
+                            <div class="feature-img-wrapper">
+                                 <img src="/assets/SocialBloomScreenshot.png" alt="Social Bloom Screenshot">
+                            </div>
+                        </div>
+                        
+                        <!-- Feature 3: Smart Search -->
+                        <div class="feature-row">
+                            <div class="feature-text">
+                                <h3>
+                                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    ${isKo ? '지난 일정 완벽 검색' : 'Smart Search'}
+                                </h3>
+                                <p>
+                                    ${isKo 
+                                        ? '그때 그 맛집 이름이 뭐였더라?<br>기억나지 않는 날짜도 걱정 마세요.<br><strong>코사인 유사도 검색</strong>으로 키워드만 입력하면 바로 찾아드립니다.' 
+                                        : 'Forgot the date? No problem.<br>Our smart search finds your past events instantly.<br>Just type a keyword, and travel back in time.'}
+                                </p>
+                            </div>
+                            <div class="feature-img-wrapper">
+                                 <img src="/assets/SearchFeatureScreenshot.png" alt="Search Feature Screenshot">
+                            </div>
+                        </div>
+        
+                    </div>
+                </div>
+        
+                <!-- 4. Footer -->
+                <footer>
+                    <div style="margin-bottom:20px;">
+                        <a href="/privacy.html">Privacy Policy</a> | 
+                        <a href="/terms.html">Terms of Service</a>
+                    </div>
+                    <p>&copy; 2026 Daily Bloom. All rights reserved.</p>
+                    <p style="font-size:0.8rem; margin-top:10px;">Created with ❤️ for J-Types.</p>
+                </footer>
+            </div>
+        `;
+
+        // Click to Scroll
+        const scrollBtn = this.shadowRoot.getElementById('scroll-btn');
+        if (scrollBtn) {
+            scrollBtn.addEventListener('click', () => {
+                const firstSection = this.shadowRoot.getElementById('first-section');
+                firstSection.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+
+        this.shadowRoot.getElementById('google-btn').addEventListener('click', () => {
+            signInWithPopup(auth, provider).catch((error) => {
+                console.error("Login Error:", error);
+                alert("Login failed: " + error.message);
+            });
+        });
+        
+        this.shadowRoot.getElementById('lang-btn').addEventListener('click', () => {
+            store.toggleLang();
+        });
+    }
 }
 customElements.define('app-login', AppLogin);
 
@@ -1486,7 +1715,7 @@ class MyPage extends BaseComponent {
             
             /* Responsive Input Groups */
             .input-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-            .input-row input { flex: 1; min-width: 0; } /* min-width 0 allows flex item to shrink below content size */
+            .input-row input { flex: 1; min-width: 0; }
             .input-row button { flex-shrink: 0; }
             
             @media (max-width: 400px) {

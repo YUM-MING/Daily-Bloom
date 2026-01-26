@@ -49,6 +49,10 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
     - **UI Consistency**: Ensure all buttons and placeholders update immediately upon language toggle.
     - **Notifications**: Implemented dynamic translation for new notifications (Tag, Bloom, Comment) using `messageKey` storage.
 - [x] **AdSense Policy Compliance**:
+    - **Legal Pages**: Created `privacy.html` and `terms.html` to meet strict policy requirements.
+    - **Sitemap & Robots**: Updated `sitemap.xml` and `robots.txt` to ensure crawlers can find the new legal pages.
+    - **Verification**: Added `google-adsense-account` meta tag to `index.html`.
+    - **Accessibility**: Added `<noscript>` content with links to legal pages for better crawler visibility.
     - **Delayed Script Loading**: AdSense script now loads dynamically only after the main app content or enhanced login content is visible. This prevents ads from appearing on the "Loading..." screen.
     - **Enhanced Login Content**: Added a detailed "About Daily Bloom" section to the login page with feature descriptions in English and Korean to satisfy "publisher content" requirements.
     - **Empty State Improvements**: Added descriptive and encouraging text to empty task and goal lists to maintain content value.
