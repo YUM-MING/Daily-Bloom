@@ -225,9 +225,17 @@ class Store extends EventTarget {
   initAuth() {
       onAuthStateChanged(auth, async (firebaseUser) => {
           const getLoadingScreen = () => document.getElementById('loading-screen');
+          const landingPage = document.getElementById('static-landing');
+          const appView = document.getElementById('app-view');
           
           if (firebaseUser) {
               console.log("User detected (Auth Changed):", firebaseUser.email);
+              
+              // Show loading if transitioning from landing
+              if (landingPage && !landingPage.classList.contains('hidden')) {
+                  const loader = getLoadingScreen();
+                  if(loader) loader.classList.remove('hidden');
+              }
               
               const userRef = doc(db, "users", firebaseUser.uid);
               try {
@@ -282,16 +290,13 @@ class Store extends EventTarget {
                       localStorage.setItem('helpShown', 'true');
                   }
 
-                  // Show App
+                  // HIDE Landing & Loading, SHOW App
                   const loader = getLoadingScreen();
-                  if(loader) loader.remove(); 
+                  if(loader) loader.classList.add('hidden');
                   
-                  const loginView = document.getElementById('login-view');
-                  const appView = document.getElementById('app-view');
-                  
-                  if(loginView) {
-                      loginView.classList.add('hidden');
-                      loginView.style.display = 'none';
+                  if(landingPage) {
+                      landingPage.classList.add('hidden');
+                      landingPage.style.display = 'none';
                   }
                   if(appView) {
                       appView.classList.remove('hidden');
@@ -305,29 +310,41 @@ class Store extends EventTarget {
               } catch (e) {
                   console.error("Error fetching/creating user profile:", e);
                   const loader = getLoadingScreen();
-                  if(loader) loader.remove();
+                  if(loader) loader.classList.add('hidden');
                   alert("Error loading profile: " + e.message);
               }
           } else {
               console.log("No user signed in.");
               this.setState({ user: null, tasks: {}, goals: {} });
               
-              // Show Login
+              // SHOW Landing, HIDE App & Loading
               const loader = getLoadingScreen();
-              if(loader) loader.remove();
+              if(loader) loader.classList.add('hidden');
               
-              const loginView = document.getElementById('login-view');
-              const appView = document.getElementById('app-view');
-
-              if(loginView) {
-                  loginView.classList.remove('hidden');
-                  loginView.style.display = 'flex'; 
+              if(landingPage) {
+                  landingPage.classList.remove('hidden');
+                  landingPage.style.display = 'flex'; 
               }
               if(appView) {
                   appView.classList.add('hidden');
                   appView.style.display = 'none';
               }
               
+              // Attach Login Listener to Static Button
+              const loginBtn = document.getElementById('google-login-btn');
+              if (loginBtn) {
+                  // Remove old listeners to avoid duplicates (cloning is a cheap way)
+                  const newBtn = loginBtn.cloneNode(true);
+                  loginBtn.parentNode.replaceChild(newBtn, loginBtn);
+                  
+                  newBtn.addEventListener('click', () => {
+                      signInWithPopup(auth, provider).catch((error) => {
+                          console.error("Login Error:", error);
+                          alert("Login failed: " + error.message);
+                      });
+                  });
+              }
+
               // Load AdSense after showing login content
               this.loadAdSense();
           }

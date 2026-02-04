@@ -32,10 +32,10 @@
   <!-- AdSense Verification -->
   <meta name="google-adsense-account" content="ca-pub-3685380356679104">
 
-  <!-- Basic SEO -->
+  <!-- SEO & Metadata -->
   <title>Daily Bloom | Minimalist Planner for MBTI "J" & Social Scheduling</title>
   <meta name="description" content="Daily Bloom is the perfect minimalist planner for MBTI 'J' types. Schedule your day, track monthly goals, and share 'Blooms' with friends. Simple, beautiful, and social." />
-  <meta name="keywords" content="Planner, Daily Planner, Schedule, MBTI J, ToDo List, Calendar, Social Planner, Daily Bloom, Motivation, Habit Tracker" />
+  <meta name="keywords" content="Planner, Daily Planner, Schedule, MBTI J, ToDo List, Calendar, Social Planner, Daily Bloom, Motivation, Habit Tracker, Time Management" />
   <link rel="canonical" href="https://dailybloomyourday.web.app/" />
 
   <!-- Open Graph / Facebook -->
@@ -72,7 +72,7 @@
     },
     "author": {
       "@type": "Person",
-      "name": "YUM-MING"
+      "name": "Daily Bloom Team"
     }
   }
   </script>
@@ -81,31 +81,432 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@600&family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <noscript>
-    <div style="padding: 20px; text-align: center; color: #333; font-family: sans-serif;">
-        <h1>Daily Bloom</h1>
-        <p>This application requires JavaScript to function.</p>
-        <p>Daily Bloom is a minimalist daily planner designed for structured minds.</p>
-        <p>
-          <a href="/privacy.html" style="color: #ffc1cc;">Privacy Policy</a> | 
-          <a href="/terms.html" style="color: #ffc1cc;">Terms of Service</a>
-        </p>
-    </div>
-  </noscript>
+  <!-- Static Landing Content (For AdSense/SEO & Fast Load) -->
+  <div id="static-landing" class="landing-page-wrapper" data-lang="ko">
+      <style>
+          /* Inline critical styles for landing page */
+          .landing-page-wrapper { width: 100%; display: flex; flex-direction: column; background: var(--bg-color); color: var(--text-color); overflow-x: hidden; }
+          
+          /* Language Toggle Button */
+          .lang-switch-btn { position: fixed; top: 20px; right: 20px; z-index: 1000; background: var(--surface-color); border: 2px solid var(--primary-color); color: var(--text-color); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; font-family: 'Quicksand', sans-serif; transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+          .lang-switch-btn:hover { background: var(--primary-color); color: white; }
 
-  <!-- Loading Overlay -->
-  <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-color); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+          /* Multi-lang visibility */
+          [data-lang="ko"] [data-en] { display: none !important; }
+          [data-lang="en"] [data-ko] { display: none !important; }
+
+          /* Hero Section */
+          .landing-hero { min-height: 85vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; background: radial-gradient(circle at center, rgba(255,193,204,0.1) 0%, transparent 70%); }
+          .landing-title { font-family: 'Dancing Script', cursive; font-size: 5rem; color: var(--primary-color); margin-bottom: 20px; line-height: 1.1; animation: fadeInDown 1s ease-out; }
+          .landing-tagline { font-family: 'Gowun Dodum', sans-serif; color: var(--text-color); margin-bottom: 40px; font-size: 1.6rem; opacity: 0.9; max-width: 800px; animation: fadeInUp 1s ease-out 0.2s backwards; }
+          .landing-btn { font-family: 'Gowun Dodum', sans-serif; font-size: 1.3rem; padding: 16px 48px; border-radius: 50px; background: var(--primary-color); color: #fff; box-shadow: 0 6px 20px rgba(255, 193, 204, 0.5); border: none; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; font-weight: bold; animation: fadeInUp 1s ease-out 0.4s backwards; }
+          .landing-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(255, 193, 204, 0.6); }
+
+          /* Sections General */
+          .landing-section { padding: 100px 20px; width: 100%; box-sizing: border-box; }
+          .container-limit { max-width: 1200px; margin: 0 auto; }
+          .section-title { font-family: 'Quicksand', sans-serif; font-size: 2.5rem; color: var(--text-color); margin-bottom: 50px; text-align: center; font-weight: 700; position: relative; }
+          .section-title::after { content: ''; display: block; width: 60px; height: 4px; background: var(--primary-color); margin: 15px auto 0; border-radius: 2px; }
+
+          /* Features */
+          .feature-grid { display: flex; flex-direction: column; gap: 100px; }
+          .feature-item { display: flex; gap: 60px; align-items: center; }
+          .feature-item.reverse { flex-direction: row-reverse; }
+          .feature-text { flex: 1; }
+          .feature-text h3 { font-size: 2.2rem; color: var(--text-color); margin-bottom: 20px; font-family: 'Quicksand', sans-serif; }
+          .feature-text p { font-size: 1.2rem; line-height: 1.8; opacity: 0.8; color: var(--text-color); }
+          .feature-img { flex: 1.2; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.1); border: 1px solid var(--border-color); transition: transform 0.3s; background: white; }
+          .feature-img:hover { transform: translateY(-5px); }
+          .feature-img img { width: 100%; height: auto; display: block; object-fit: cover; }
+
+          /* Target Audience (3 Cards) */
+          .target-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-top: 40px; }
+          .target-card { background: var(--surface-color); padding: 40px 30px; border-radius: 20px; text-align: center; border: 1px solid var(--border-color); transition: all 0.3s; box-shadow: 0 5px 15px rgba(0,0,0,0.03); }
+          .target-card:hover { transform: translateY(-5px); border-color: var(--primary-color); box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+          .target-icon { font-size: 3rem; margin-bottom: 20px; display: block; }
+          .target-card h3 { margin-bottom: 15px; font-size: 1.4rem; }
+          .target-card p { opacity: 0.8; line-height: 1.6; }
+
+          /* FAQ */
+          .faq-list { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+          .faq-item { background: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; }
+          .faq-question { padding: 20px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+          .faq-answer { padding: 0 20px 20px; opacity: 0.8; line-height: 1.6; border-top: 1px solid var(--border-color); margin-top: -1px; padding-top: 20px; }
+          .faq-item:hover { border-color: var(--primary-color); }
+
+          /* Animations */
+          @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+          /* Responsive */
+          @media (max-width: 900px) {
+              .landing-title { font-size: 3.5rem; }
+              .feature-item, .feature-item.reverse { flex-direction: column; text-align: center; gap: 30px; }
+              .feature-text { padding: 0 10px; }
+              .target-grid { grid-template-columns: 1fr; max-width: 500px; margin: 0 auto; }
+              .landing-section { padding: 60px 20px; }
+          }
+      </style>
+
+      <button class="lang-switch-btn" id="static-lang-toggle">English / 한국어</button>
+
+      <!-- 1. Hero Section -->
+      <div class="landing-hero">
+          <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:120px; margin-bottom:20px; animation: fadeInDown 1s ease-out;">
+          <h1 class="landing-title">Daily Bloom</h1>
+          <p class="landing-tagline">
+              <span data-ko>계획적인 J형을 위한 가장 아름다운 시작.<br>친구와 함께 꿈을 피워보세요.</span>
+              <span data-en>The most beautiful start for structured minds.<br>Bloom your day together with friends.</span>
+          </p>
+          
+          <button class="landing-btn" id="google-login-btn">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:24px; margin-right:10px; background:white; border-radius:50%; padding:2px;">
+              <span data-ko>구글로 1초 만에 시작하기</span>
+              <span data-en>Sign in with Google</span>
+          </button>
+          
+          <p style="margin-top: 20px; opacity: 0.6; font-size: 0.9rem;">
+              <span data-ko>별도의 앱 설치 없이 웹에서 바로 실행됩니다.</span>
+              <span data-en>Runs directly on the web. No installation required.</span>
+          </p>
+      </div>
+
+      <!-- 2. Target Audience -->
+      <div class="landing-section" style="background: var(--surface-color);">
+          <div class="container-limit">
+              <h2 class="section-title">
+                  <span data-ko>누구를 위한 플래너인가요?</span>
+                  <span data-en>Who is this for?</span>
+              </h2>
+              <div class="target-grid">
+                  <div class="target-card">
+                      <span class="target-icon">🧐</span>
+                      <h3><span data-ko>체계적인 J형 (MBTI)</span><span data-en>Structured MBTI 'J'</span></h3>
+                      <p>
+                          <span data-ko>즉흥적인 것은 불안한 당신.<br>깔끔하게 정리된 일정표를 보면 마음이 편안해지는 분들을 위해 설계되었습니다.</span>
+                          <span data-en>Do you feel anxious without a plan?<br>Daily Bloom is designed for those who find peace in a well-organized schedule.</span>
+                      </p>
+                  </div>
+                  <div class="target-card">
+                      <span class="target-icon">🎓</span>
+                      <h3><span data-ko>대학생 & 취준생</span><span data-en>Students & Strivers</span></h3>
+                      <p>
+                          <span data-ko>시험 기간 공부 계획, 자격증 일정.<br>친구들과 서로의 공부 시간을 공유하고 서로 자극을 주고받으세요.</span>
+                          <span data-en>Perfect for exam prep and goal tracking.<br>Share your study schedule with friends and motivate each other.</span>
+                      </p>
+                  </div>
+                  <div class="target-card">
+                      <span class="target-icon">✈️</span>
+                      <h3><span data-ko>여행 & 프로젝트 러버</span><span data-en>Travelers & Project Lovers</span></h3>
+                      <p>
+                          <span data-ko>"2박 3일 부산 여행"<br>연속된 일정을 시각적인 막대그래프(Gantt Chart)로 한눈에 관리하고 싶다면 딱입니다.</span>
+                          <span data-en>"3-day trip to Paris"<br>Manage multi-day events with a beautiful visual bar (Gantt-style) at a glance.</span>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- New Section: Stats -->
+      <div class="landing-section">
+          <div class="container-limit">
+              <div class="target-grid" style="text-align: center;">
+                  <div>
+                      <h3 style="font-size: 3rem; color: var(--primary-color); font-family: 'Dancing Script'; margin-bottom: 10px;">85%</h3>
+                      <p style="font-weight: bold;">
+                          <span data-ko>목표 달성률 증가</span>
+                          <span data-en>Goal Achievement</span>
+                      </p>
+                      <p style="font-size: 0.9rem; opacity: 0.7;">
+                          <span data-ko>시각적인 동기부여 효과</span>
+                          <span data-en>Visual motivation effect</span>
+                      </p>
+                  </div>
+                  <div>
+                      <h3 style="font-size: 3rem; color: var(--primary-color); font-family: 'Dancing Script'; margin-bottom: 10px;">3x</h3>
+                      <p style="font-weight: bold;">
+                          <span data-ko>습관 지속성</span>
+                          <span data-en>Habit Retention</span>
+                      </p>
+                      <p style="font-size: 0.9rem; opacity: 0.7;">
+                          <span data-ko>친구와 함께할 때의 효과</span>
+                          <span data-en>Power of social accountability</span>
+                      </p>
+                  </div>
+                  <div>
+                      <h3 style="font-size: 3rem; color: var(--primary-color); font-family: 'Dancing Script'; margin-bottom: 10px;">100%</h3>
+                      <p style="font-weight: bold;">
+                          <span data-ko>프라이버시 보호</span>
+                          <span data-en>Privacy Protected</span>
+                      </p>
+                      <p style="font-size: 0.9rem; opacity: 0.7;">
+                          <span data-ko>나만의 비밀 일정 완벽 분리</span>
+                          <span data-en>Secure private schedule mode</span>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- 3. Key Features -->
+      <div class="landing-section" style="background: var(--surface-color);">
+          <div class="container-limit">
+              <h2 class="section-title">
+                  <span data-ko>Daily Bloom만의 특별함</span>
+                  <span data-en>Why Daily Bloom?</span>
+              </h2>
+              <div class="feature-grid">
+                  <!-- Feature 1 -->
+                  <div class="feature-item">
+                      <div class="feature-text">
+                          <h3>
+                              <span data-ko>01. 입력은 단순하게, 표현은 화려하게</span>
+                              <span data-en>01. Simple Input, Rich Visualization</span>
+                          </h3>
+                          <p>
+                              <span data-ko>복잡한 설정창은 버렸습니다. 카톡 보내듯 텍스트만 입력하세요.<br><br>
+                              • <strong>#d3</strong> : "제주도 여행 #d3" → 3일짜리 긴 일정 바 생성<br>
+                              • <strong>#w4</strong> : "필라테스 #w8" → 8주 동안 자동 반복 등록</span>
+                              <span data-en>Forget complex forms. Just type like you're texting.<br><br>
+                              • <strong>#d3</strong> : "Trip #d3" → Creates a 3-day duration bar.<br>
+                              • <strong>#w4</strong> : "Yoga #w8" → Repeats every week for 8 weeks.</span>
+                          </p>
+                      </div>
+                      <div class="feature-img">
+                          <img src="/assets/CalendarViewScreenshot.png" alt="스마트 일정 입력 예시">
+                      </div>
+                  </div>
+
+                  <!-- Feature 2 -->
+                  <div class="feature-item reverse">
+                      <div class="feature-text">
+                          <h3>
+                              <span data-ko>02. 친구와 함께 피우는 하루 (Bloom)</span>
+                              <span data-en>02. Bloom Together (Social)</span>
+                          </h3>
+                          <p>
+                              <span data-ko>혼자만의 계획은 작심삼일로 끝나기 쉽습니다.<br>
+                              친구의 캘린더에 방문해 <strong>Bloom(꽃)</strong>을 남겨주세요.<br><br>
+                              응원의 댓글과 함께라면 귀찮았던 할 일도 즐거운 미션이 됩니다. <strong>@친구태그</strong> 기능으로 약속을 한 번에 공유하는 것도 잊지 마세요.</span>
+                              <span data-en>Planning alone is hard. Doing it together is fun.<br>
+                              Visit your friends' calendars and leave a <strong>Bloom</strong>.<br><br>
+                              Encouragement turns chores into missions. Use <strong>@Tag</strong> to share events instantly with your Blooms.</span>
+                          </p>
+                      </div>
+                      <div class="feature-img">
+                          <img src="/assets/SocialBloomScreenshot.png" alt="소셜 기능 예시">
+                      </div>
+                  </div>
+                  
+                  <!-- Feature 3 -->
+                  <div class="feature-item">
+                      <div class="feature-text">
+                          <h3>
+                              <span data-ko>03. 나를 위한 완벽한 프라이버시</span>
+                              <span data-en>03. Perfect Privacy Control</span>
+                          </h3>
+                          <p>
+                              <span data-ko>공유하고 싶지 않은 비밀 일정이 있나요?<br>
+                              <strong>자물쇠(🔒) 버튼</strong> 하나면 충분합니다.<br><br>
+                              나에게만 보이는 비밀 일정, 우리끼리만 보는 태그 일정, 모두에게 보여줄 공개 일정을 자유롭게 오가며 관리하세요.</span>
+                              <span data-en>Have a secret you don't want to share?<br>
+                              Just click the <strong>Lock (🔒) icon</strong>.<br><br>
+                              Switch between Private, Protected (tagged only), and Public modes effortlessly.</span>
+                          </p>
+                      </div>
+                      <div class="feature-img">
+                          <img src="/assets/SearchFeatureScreenshot.png" alt="검색 및 프라이버시 기능">
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- New Section: Tips for J-Types -->
+      <div class="landing-section">
+          <div class="container-limit">
+              <h2 class="section-title">
+                  <span data-ko>J형을 위한 시간 관리 꿀팁</span>
+                  <span data-en>Productivity Tips for J-Types</span>
+              </h2>
+              <div class="target-grid">
+                  <div class="target-card" style="text-align: left;">
+                      <h3 style="color:var(--primary-hover)">Tip 01.</h3>
+                      <h4>
+                          <span data-ko>계획이 틀어졌을 때</span>
+                          <span data-en>When plans go wrong</span>
+                      </h4>
+                      <p style="font-size: 0.95rem; margin-top: 10px;">
+                          <span data-ko>스트레스 받지 마세요. Daily Bloom에서는 일정을 드래그해서 다음 날로 미루는 것이 1초면 충분합니다. 유연함이 지속성을 만듭니다.</span>
+                          <span data-en>Don't stress. In Daily Bloom, dragging a task to the next day takes 1 second. Flexibility creates sustainability.</span>
+                      </p>
+                  </div>
+                  <div class="target-card" style="text-align: left;">
+                      <h3 style="color:var(--primary-hover)">Tip 02.</h3>
+                      <h4>
+                          <span data-ko>우선순위의 마법</span>
+                          <span data-en>Magic of Priorities</span>
+                      </h4>
+                      <p style="font-size: 0.95rem; margin-top: 10px;">
+                          <span data-ko>모든 일을 다 할 순 없습니다. 가장 중요한 'Monthly Goal'을 먼저 캘린더 상단에 박제하세요. 큰 그림을 놓치지 않게 도와줍니다.</span>
+                          <span data-en>You can't do it all. Pin your 'Monthly Goal' at the top of the calendar. Never lose sight of the big picture.</span>
+                      </p>
+                  </div>
+                  <div class="target-card" style="text-align: left;">
+                      <h3 style="color:var(--primary-hover)">Tip 03.</h3>
+                      <h4>
+                          <span data-ko>함께하는 힘</span>
+                          <span data-en>Power of Togetherness</span>
+                      </h4>
+                      <p style="font-size: 0.95rem; margin-top: 10px;">
+                          <span data-ko>운동이나 공부처럼 하기 싫은 일은 친구와 공유(Tag)하세요. 감시자가 있을 때 우리의 실행력은 200% 올라갑니다.</span>
+                          <span data-en>Tag a friend for workouts or study sessions. Accountability boosts execution by 200%.</span>
+                      </p>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- New Section: Testimonials -->
+      <div class="landing-section" style="background: var(--surface-color);">
+          <div class="container-limit">
+              <h2 class="section-title">
+                  <span data-ko>사용자 후기</span>
+                  <span data-en>What Users Say</span>
+              </h2>
+              <div class="target-grid">
+                  <div class="target-card" style="box-shadow: none; background: transparent; border: none;">
+                      <div style="font-size: 2rem; color: var(--primary-color); margin-bottom: 15px;">❝</div>
+                      <p style="font-style: italic; margin-bottom: 15px;">
+                          <span data-ko>"매번 작심삼일이었는데 친구랑 같이 하니 벌써 3달째 성공 중이에요! 서로 블룸 남겨주는 재미가 쏠쏠합니다."</span>
+                          <span data-en>"I used to quit easily, but doing it with friends kept me going for 3 months! Leaving Blooms for each other is so fun."</span>
+                      </p>
+                      <strong>- <span data-ko>대학생 김OO</span><span data-en>Student Kim</span></strong>
+                  </div>
+                  <div class="target-card" style="box-shadow: none; background: transparent; border: none;">
+                      <div style="font-size: 2rem; color: var(--primary-color); margin-bottom: 15px;">❝</div>
+                      <p style="font-style: italic; margin-bottom: 15px;">
+                          <span data-ko>"회사 일정과 개인 약속이 섞이는 게 싫었는데, 자물쇠 기능으로 완벽하게 분리했어요. 심플해서 너무 좋습니다."</span>
+                          <span data-en>"I hated mixing work and private life. The Lock feature separated them perfectly. Simple and effective."</span>
+                      </p>
+                      <strong>- <span data-ko>직장인 이OO</span><span data-en>Office Worker Lee</span></strong>
+                  </div>
+                  <div class="target-card" style="box-shadow: none; background: transparent; border: none;">
+                      <div style="font-size: 2rem; color: var(--primary-color); margin-bottom: 15px;">❝</div>
+                      <p style="font-style: italic; margin-bottom: 15px;">
+                          <span data-ko>"여행 계획 짤 때 엑셀 켜기 귀찮았는데, #d3 태그 하나로 3박 4일 일정이 쫙! J형의 마음을 너무 잘 아네요."</span>
+                          <span data-en>"Planning trips in Excel was a pain. One #d3 tag and my 4-day itinerary is set! It truly understands J-types."</span>
+                      </p>
+                      <strong>- <span data-ko>여행러 박OO</span><span data-en>Traveler Park</span></strong>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- 4. FAQ Section -->
+      <div class="landing-section">
+          <div class="container-limit">
+              <h2 class="section-title">
+                  <span data-ko>자주 묻는 질문 (FAQ)</span>
+                  <span data-en>Frequently Asked Questions</span>
+              </h2>
+              <div class="faq-list">
+                  <div class="faq-item">
+                      <div class="faq-question">
+                          <span data-ko>Q. 정말 무료인가요?</span>
+                          <span data-en>Q. Is it really free?</span>
+                      </div>
+                      <div class="faq-answer" style="display:block;">
+                          <span data-ko>네, Daily Bloom의 모든 핵심 기능은 평생 무료로 제공됩니다. 친구 초대, 일정 공유, 무제한 캘린더 등 모든 기능을 자유롭게 이용하세요.</span>
+                          <span data-en>Yes! All core features are free forever. Invite friends, share tasks, and use unlimited calendar items at no cost.</span>
+                      </div>
+                  </div>
+                  <div class="faq-item">
+                      <div class="faq-question">
+                          <span data-ko>Q. 앱을 다운로드해야 하나요?</span>
+                          <span data-en>Q. Do I need to download an app?</span>
+                      </div>
+                      <div class="faq-answer" style="display:block;">
+                          <span data-ko>아니요! 웹사이트(PWA) 기반이라 설치 없이 즐겨찾기만 하면 됩니다. 물론, 홈 화면에 추가하면 진짜 앱처럼 전체 화면으로 사용할 수도 있습니다.</span>
+                          <span data-en>No! It's a web-based PWA. Just bookmark it. You can also "Add to Home Screen" to use it as a standalone app.</span>
+                      </div>
+                  </div>
+                  <div class="faq-item">
+                      <div class="faq-question">
+                          <span data-ko>Q. 친구 추가는 어떻게 하나요?</span>
+                          <span data-en>Q. How do I add friends?</span>
+                      </div>
+                      <div class="faq-answer" style="display:block;">
+                          <span data-ko>로그인 후 [마이페이지]에서 '초대 링크 복사'를 누르세요. 카톡으로 링크를 보내면 친구가 클릭 한 번으로 바로 '맞블룸(친구)'이 맺어집니다.</span>
+                          <span data-en>Go to 'My Page' and copy your 'Invite Link'. Send it to a friend, and they'll become your Mutual Bloom with one click.</span>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- 5. Bottom CTA -->
+      <div class="landing-section" style="padding: 120px 20px; background: var(--surface-color);">
+          <div class="container-limit" style="text-align: center;">
+              <h2 style="font-size: 2.5rem; margin-bottom: 30px; color: var(--primary-color); font-family: 'Dancing Script';">Ready to Bloom?</h2>
+              <p style="font-size: 1.2rem; margin-bottom: 40px; opacity: 0.8;">
+                  <span data-ko>지금 바로 당신의 하루를 아름답게 계획해보세요.</span>
+                  <span data-en>Start planning your beautiful day right now.</span>
+              </p>
+              <button class="landing-btn" onclick="document.getElementById('google-login-btn').click()">
+                  <span data-ko>지금 시작하기</span>
+                  <span data-en>Get Started Now</span>
+              </button>
+          </div>
+      </div>
+
+      <!-- Footer -->
+      <footer style="padding: 60px 20px; text-align: center; border-top: 1px solid var(--border-color); background: var(--bg-color);">
+          <div style="margin-bottom:20px;">
+              <a href="/guide.html" style="color:var(--primary-color); font-weight:bold; font-size:1.1rem; margin: 0 15px; text-decoration:none;">
+                  <span data-ko>이용 가이드</span><span data-en>Guide</span>
+              </a>
+              <a href="/privacy.html" style="color:var(--text-color); margin: 0 10px; text-decoration:none; opacity:0.8;">
+                  <span data-ko>개인정보처리방침</span><span data-en>Privacy Policy</span>
+              </a>
+              <a href="/terms.html" style="color:var(--text-color); margin: 0 10px; text-decoration:none; opacity:0.8;">
+                  <span data-ko>이용약관</span><span data-en>Terms of Service</span>
+              </a>
+          </div>
+          <p style="opacity:0.6; font-size:0.9rem;">&copy; 2026 Daily Bloom. All rights reserved.</p>
+      </footer>
+      
+      <script>
+          (function() {
+              const landing = document.getElementById('static-landing');
+              const btn = document.getElementById('static-lang-toggle');
+              let currentLang = localStorage.getItem('lang') || 'ko';
+              
+              const updateLang = (l) => {
+                  currentLang = l;
+                  landing.setAttribute('data-lang', l);
+                  localStorage.setItem('lang', l);
+              };
+              
+              updateLang(currentLang);
+              
+              btn.addEventListener('click', () => {
+                  updateLang(currentLang === 'ko' ? 'en' : 'ko');
+              });
+          })();
+      </script>
+  </div>
+
+  <!-- Loading Screen (Initially Hidden, shown via JS if needed, but we prefer showing landing page first) -->
+  <div id="loading-screen" class="hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-color); z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column;">
     <img src="/assets/logo.svg" alt="Daily Bloom Logo" style="width:80px; animation: pulse 2s infinite;">
     <p style="margin-top:20px; color:var(--primary-color); font-family:'Dancing Script', cursive; font-size:1.5rem;">Loading...</p>
   </div>
 
-  <app-login id="login-view" class="hidden"></app-login>
-
+  <!-- Main App (Hidden by default) -->
   <div class="container hidden" id="app-view">
     <app-header></app-header>
-    
     <my-page class="hidden"></my-page>
-
     <goal-list></goal-list>
     <div id="main-content">
       <calendar-view></calendar-view>
