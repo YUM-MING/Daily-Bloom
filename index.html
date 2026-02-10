@@ -81,6 +81,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@600&family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700&family=Pretendard:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- Flicker Prevention Script -->
+  <script>
+    (function() {
+      if (localStorage.getItem('isLoggedIn') === 'true') {
+        document.write('<style>#static-landing { display: none !important; }</style>');
+        window.addEventListener('DOMContentLoaded', () => {
+          const loader = document.getElementById('loading-screen');
+          if (loader) loader.classList.remove('hidden');
+        });
+      }
+    })();
+  </script>
+
   <!-- Static Landing Content (For AdSense/SEO & Fast Load) -->
   <div id="static-landing" class="landing-page-wrapper" data-lang="ko">
       <style>

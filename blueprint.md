@@ -29,6 +29,9 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
   - **Nested Replies**: Support for threaded conversations with visual indentation.
   - **Threaded Notifications**: Automatic alerts for all participants in a comment thread (original commenter + previous repliers).
   - Visiting friends' calendars with distinct UI (color banners, read-only mode).
+- [x] **Holiday & Weekend Highlighting**:
+  - Highlights Korean national holidays (2025-2026) with labels and red color.
+  - Sundays are colored red, and Saturdays are colored blue for better visibility.
 - [x] **Goal Tracking**: Monthly goal management with deletion and completion features.
 
 ## Technical Details
@@ -37,6 +40,12 @@ A modern, minimalist daily planner web application designed for MBTI "J" types w
 - **Fuzzy Search:** Implemented a scoring algorithm based on character order and string proximity.
 - **Visual Continuity:** CSS trickery with negative margins and group ordering to ensure multi-day task bars appear seamless across the calendar grid.
 - **Real-time UI:** Leveraged `onSnapshot` from Firestore for zero-refresh updates on tasks, comments, and notifications.
+
+## Performance & UX Optimization
+- **Flicker Prevention**: Inline script in `index.html` checks `localStorage` for login status to hide the landing page and show the loader immediately during boot.
+- **Parallel Data Loading**: Authentication flow parallelizes user profile fetching and data collection (tasks, goals, blooms) to minimize time-to-interactive.
+- **Batch Data Fetching**: Optimized `loadBlooms` to use `Promise.all` for parallel fetching of friend profiles, reducing linear delays.
+- **Instant App Transition**: UI switches to the main application view as soon as the core user profile is available, with secondary data loading in the background.
 
 ## Current Plan: Global Expansion & SEO (2026-01-20)
 - [ ] **SEO Overhaul**:

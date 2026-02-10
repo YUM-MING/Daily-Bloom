@@ -160,6 +160,49 @@ const TRANSLATIONS = {
 };
 
 /**
+ * Holiday Data (2025-2026)
+ */
+const HOLIDAYS = {
+  "2025-01-01": "신정",
+  "2025-01-28": "설날",
+  "2025-01-29": "설날",
+  "2025-01-30": "설날",
+  "2025-03-01": "삼일절",
+  "2025-03-03": "대체공휴일",
+  "2025-05-05": "어린이날/부처님오신날",
+  "2025-05-06": "대체공휴일",
+  "2025-06-06": "현충일",
+  "2025-08-15": "광복절",
+  "2025-10-03": "개천절",
+  "2025-10-05": "추석",
+  "2025-10-06": "추석",
+  "2025-10-07": "추석",
+  "2025-10-08": "대체공휴일",
+  "2025-10-09": "한글날",
+  "2025-12-25": "성탄절",
+  
+  "2026-01-01": "신정",
+  "2026-02-16": "설날",
+  "2026-02-17": "설날",
+  "2026-02-18": "설날",
+  "2026-03-01": "삼일절",
+  "2026-03-02": "대체공휴일",
+  "2026-05-05": "어린이날",
+  "2026-05-24": "부처님오신날",
+  "2026-05-25": "대체공휴일",
+  "2026-06-06": "현충일",
+  "2026-08-15": "광복절",
+  "2026-08-17": "대체공휴일",
+  "2026-09-24": "추석",
+  "2026-09-25": "추석",
+  "2026-09-26": "추석",
+  "2026-10-03": "개천절",
+  "2026-10-05": "대체공휴일",
+  "2026-10-09": "한글날",
+  "2026-12-25": "성탄절"
+};
+
+/**
  * Store - Now using Firestore
  */
 class Store extends EventTarget {
@@ -230,6 +273,7 @@ class Store extends EventTarget {
           
           if (firebaseUser) {
               console.log("User detected (Auth Changed):", firebaseUser.email);
+              localStorage.setItem('isLoggedIn', 'true');
               
               // Show loading if transitioning from landing
               if (landingPage && !landingPage.classList.contains('hidden')) {
@@ -261,6 +305,21 @@ class Store extends EventTarget {
                       this.setState({ user: { ...firebaseUser, ...newUser } });
                   }
                   
+                  // HIDE Landing & Loading, SHOW App ASAP
+                  const loader = getLoadingScreen();
+                  if(loader) loader.classList.add('hidden');
+                  
+                  if(landingPage) {
+                      landingPage.classList.add('hidden');
+                      landingPage.style.display = 'none';
+                  }
+                  if(appView) {
+                      appView.classList.remove('hidden');
+                      appView.style.display = 'block';
+                      appView.style.visibility = 'visible'; 
+                  }
+                  
+                  // Start loading other data in parallel
                   this.loadTasks();
                   this.loadGoals();
                   this.loadBlooms();
@@ -290,19 +349,6 @@ class Store extends EventTarget {
                       localStorage.setItem('helpShown', 'true');
                   }
 
-                  // HIDE Landing & Loading, SHOW App
-                  const loader = getLoadingScreen();
-                  if(loader) loader.classList.add('hidden');
-                  
-                  if(landingPage) {
-                      landingPage.classList.add('hidden');
-                      landingPage.style.display = 'none';
-                  }
-                  if(appView) {
-                      appView.classList.remove('hidden');
-                      appView.style.display = 'block';
-                      appView.style.visibility = 'visible'; 
-                  }
                   console.log("App view forced shown and loading screen removed.");
 
                   // Load AdSense only after content is ready
@@ -315,6 +361,7 @@ class Store extends EventTarget {
               }
           } else {
               console.log("No user signed in.");
+              localStorage.removeItem('isLoggedIn');
               this.setState({ user: null, tasks: {}, goals: {} });
               
               // SHOW Landing, HIDE App & Loading
@@ -384,12 +431,14 @@ class Store extends EventTarget {
 
   prevMonth() {
     const d = new Date(this.state.currentDate);
+    d.setDate(1); // Fix: Set to 1st to avoid overflow when prev month is shorter
     d.setMonth(d.getMonth() - 1);
     this.setState({ currentDate: d, selectedDate: null });
   }
 
   nextMonth() {
     const d = new Date(this.state.currentDate);
+    d.setDate(1); // Fix: Set to 1st to avoid overflow when next month is shorter
     d.setMonth(d.getMonth() + 1);
     this.setState({ currentDate: d, selectedDate: null });
   }
@@ -706,14 +755,17 @@ class Store extends EventTarget {
           return;
       }
       
-      const bloomsData = [];
-      for(const uid of bloomsList) {
-          const docSnap = await getDoc(doc(db, "users", uid));
-          if(docSnap.exists()) {
-              bloomsData.push({ uid, ...docSnap.data() });
-          }
+      try {
+          const promises = bloomsList.map(uid => getDoc(doc(db, "users", uid)));
+          const snapshots = await Promise.all(promises);
+          const bloomsData = snapshots
+              .filter(snap => snap.exists())
+              .map(snap => ({ uid: snap.id, ...snap.data() }));
+          
+          this.setState({ blooms: bloomsData });
+      } catch (e) {
+          console.error("Error loading blooms:", e);
       }
-      this.setState({ blooms: bloomsData });
   }
 
   async updateNickname(newNickname) {
@@ -2471,7 +2523,11 @@ class CalendarView extends BaseComponent {
                 }
 
                 .day-cell:hover { border-color: var(--primary-color); transform: translateY(-2px); z-index: 10; }
-                .day-number { font-weight: bold; margin-bottom: 4px; font-size: 0.8rem; }
+                .day-number-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+                .day-number { font-weight: bold; font-size: 0.8rem; }
+                .holiday-name { font-size: 0.6rem; color: #ff5252; text-align: right; word-break: keep-all; line-height: 1; }
+                .holiday-cell .day-number { color: #ff5252; }
+                .saturday-cell .day-number { color: #448aff; }
                 .today { background-color: rgba(233, 30, 99, 0.05); border: 1px solid var(--primary-hover); }
                 .selected { border: 2px solid var(--primary-color); background-color: rgba(255, 193, 204, 0.1); }
                 
@@ -2628,9 +2684,23 @@ class CalendarView extends BaseComponent {
                         });
 
                         const dayOfWeek = new Date(year, month, d).getDay();
+                        const holidayName = HOLIDAYS[dateStr];
+                        const isHoliday = !!holidayName;
+                        const isSunday = dayOfWeek === 0;
+                        const isSaturday = dayOfWeek === 6;
+
+                        let cellClass = 'day-cell';
+                        if (isToday) cellClass += ' today';
+                        if (isSelected) cellClass += ' selected';
+                        if (isHoliday || isSunday) cellClass += ' holiday-cell';
+                        if (isSaturday) cellClass += ' saturday-cell';
+
                         return `
-                            <div class="day-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateStr}" style="z-index: ${50 - d};">
-                                <div class="day-number">${d}</div>
+                            <div class="${cellClass}" data-date="${dateStr}" style="z-index: ${50 - d};">
+                                <div class="day-number-row">
+                                    <span class="day-number">${d}</span>
+                                    ${isHoliday ? `<span class="holiday-name">${holidayName}</span>` : ''}
+                                </div>
                                 ${dayTasks.slice(0, 3).map(t => {
                                     const isMulti = t.duration && t.duration > 1;
                                     let multiClass = '';
